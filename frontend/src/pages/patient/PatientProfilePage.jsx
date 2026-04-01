@@ -172,3 +172,157 @@ export default function PatientProfilePage() {
       setError(err.message || "Medical profile update failed");
     }
   }
+
+  return (
+    <div>
+      <h3>Medical Profile</h3>
+      {error && <div className="alert">{error}</div>}
+      {message && (
+        <div className="alert" style={{ color: "#d3f2d3", background: "rgba(0,255,0,0.08)", borderColor: "rgba(0,255,0,0.3)" }}>
+          {message}
+        </div>
+      )}
+      <form onSubmit={handleSave}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+          <div className="form-group">
+            <label>First Name</label>
+            <input
+              value={medicalProfile.first_name || ""}
+              onChange={(e) => setMedicalProfile((prev) => ({ ...prev, first_name: e.target.value }))}
+              placeholder="Given name"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label>Last Name</label>
+            <input
+              value={medicalProfile.last_name || ""}
+              onChange={(e) => setMedicalProfile((prev) => ({ ...prev, last_name: e.target.value }))}
+              placeholder="Family name"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label>Mobile</label>
+            <input
+              value={medicalProfile.mobile || ""}
+              onChange={(e) => setMedicalProfile((prev) => ({ ...prev, mobile: e.target.value }))}
+              placeholder="Phone number"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label>Age</label>
+            <input
+              type="number"
+              min="0"
+              value={medicalProfile.age ?? ""}
+              onChange={(e) => setMedicalProfile((prev) => ({ ...prev, age: e.target.value }))}
+              placeholder="Age in years"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label>Gender</label>
+            <select
+              value={medicalProfile.gender || ""}
+              onChange={(e) => setMedicalProfile((prev) => ({ ...prev, gender: e.target.value }))}
+              required
+            >
+              <option value="">Select gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="non_binary">Non-binary</option>
+              <option value="prefer_not_to_say">Prefer not to say</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label>Height (cm)</label>
+            <input
+              type="number"
+              min="0"
+              value={medicalProfile.height_cm ?? ""}
+              onChange={(e) => setMedicalProfile((prev) => ({ ...prev, height_cm: e.target.value }))}
+              placeholder="e.g. 170"
+            />
+          </div>
+          <div className="form-group">
+            <label>Weight (kg)</label>
+            <input
+              type="number"
+              min="0"
+              value={medicalProfile.weight_kg ?? ""}
+              onChange={(e) => setMedicalProfile((prev) => ({ ...prev, weight_kg: e.target.value }))}
+              placeholder="e.g. 65"
+            />
+          </div>
+          <div className="form-group">
+            <label>Blood Group</label>
+            <select
+              value={medicalProfile.blood_group || "UNKNOWN"}
+              onChange={(e) => setMedicalProfile((prev) => ({ ...prev, blood_group: e.target.value }))}
+              required
+            >
+              <option value="UNKNOWN">Unknown</option>
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>Disability / Accessibility Needs</label>
+          <textarea
+            value={medicalProfile.disability_notes || ""}
+            onChange={(e) => setMedicalProfile((prev) => ({ ...prev, disability_notes: e.target.value }))}
+            placeholder="List any disabilities, assistive devices, or accessibility preferences"
+          />
+        </div>
+
+        {MEDICAL_FIELD_CONFIGS.map((field) => (
+          <div key={field.key} className="form-group">
+            <label>{field.label}</label>
+            <select
+              value={medicalSelections[field.key] || "NA"}
+              onChange={(e) => handleMedicalSelectionChange(field.key, e.target.value)}
+            >
+              <option value="NA">NA</option>
+              {MEDICAL_DROPDOWN_OPTIONS[field.key].map((option) => (
+                <option key={`${field.key}-${option}`} value={option}>
+                  {option}
+                </option>
+              ))}
+              <option value={OTHER_OPTION_VALUE}>Other (Type manually)</option>
+            </select>
+
+            {medicalSelections[field.key] === OTHER_OPTION_VALUE && (
+              <textarea
+                value={customMedicalValues[field.key] || ""}
+                onChange={(e) => handleMedicalOtherInput(field.key, e.target.value)}
+                placeholder={field.placeholder}
+              />
+            )}
+          </div>
+        ))}
+
+        <div className="form-group">
+          <label>Previous Diagnosis</label>
+          <textarea
+            value={medicalProfile.previous_diagnosis || ""}
+            placeholder="Describe previous diagnosis history"
+            readOnly
+          />
+        </div>
+
+        <button type="submit" className="btn">Save Medical Profile</button>
+      </form>
+    </div>
+  );
+}
