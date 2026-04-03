@@ -155,3 +155,163 @@ export default function DoctorSlotsPage() {
       setError(err.message || "Slot update failed");
     }
   }
+
+  return (
+    <div>
+      <h3>Fixed Shift Scheduling</h3>
+      {error && <div className="alert">{error}</div>}
+      {message && (
+        <div className="alert" style={{ color: "#d3f2d3", background: "rgba(0,255,0,0.08)", borderColor: "rgba(0,255,0,0.3)" }}>
+          {message}
+        </div>
+      )}
+
+      <form onSubmit={handleCreateWeeklyRule} style={{ marginBottom: 14 }}>
+        <div className="form-group">
+          <label>Weekday</label>
+          <select
+            value={availabilityForm.weekday}
+            onChange={(e) => setAvailabilityForm((prev) => ({ ...prev, weekday: e.target.value }))}
+            required
+          >
+            <option value="">Select weekday</option>
+            {WEEK_DAYS.map((day) => (
+              <option key={day.value} value={day.value}>
+                {day.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Shift</label>
+          <select
+            value={availabilityForm.shift_type}
+            onChange={(e) => setAvailabilityForm((prev) => ({ ...prev, shift_type: e.target.value }))}
+            required
+          >
+            {SHIFTS.map((shift) => (
+              <option key={shift.value} value={shift.value}>
+                {shift.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button type="submit" className="btn">Save Weekly Shift Rule</button>
+      </form>
+
+      <h3>Weekly Shift Rules</h3>
+      <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
+        {availabilityRules.map((rule) => (
+          <div key={rule.id} style={{ border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, padding: 10 }}>
+            <p style={{ margin: 0 }}>
+              {rule.weekday_name} - {rule.shift_label || `${rule.start_time}-${rule.end_time}`}
+            </p>
+            <p style={{ margin: "6px 0" }}>Active: {String(rule.is_active)}</p>
+            <button className="btn" style={{ width: "auto", padding: "8px 12px" }} onClick={() => toggleRuleActive(rule)}>
+              Toggle Rule
+            </button>
+          </div>
+        ))}
+        {!availabilityRules.length && <p className="small">No weekly shift rules set yet.</p>}
+      </div>
+
+      <h3>Generated Slots</h3>
+      <div style={{ border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: 12, marginBottom: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <button
+            type="button"
+            className="btn"
+            style={{ width: "auto", padding: "8px 12px" }}
+            onClick={() =>
+              setVisibleMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
+            }
+          >
+            Prev
+          </button>
+          <h4 style={{ margin: 0 }}>{monthLabel(visibleMonth)}</h4>
+          <button
+            type="button"
+            className="btn"
+            style={{ width: "auto", padding: "8px 12px" }}
+            onClick={() =>
+              setVisibleMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
+            }
+          >
+            Next
+          </button>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 6, marginBottom: 8 }}>
+          {DAY_LABELS.map((label) => (
+            <div key={label} style={{ textAlign: "center", fontSize: 12, opacity: 0.72 }}>
+              {label}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 6 }}>
+          {calendarCells.map((cell, index) => {
+            if (!cell) {
+              return <div key={`empty-${index}`} style={{ minHeight: 42 }} />;
+            }
+
+            const selected = cell.isoDate === selectedDate;
+            return (
+              <button
+                key={cell.isoDate}
+                type="button"
+                onClick={() => setSelectedDate(cell.isoDate)}
+                style={{
+                  minHeight: 42,
+                  borderRadius: 8,
+                  border: cell.hasSlots ? "1px solid rgba(68,215,182,0.55)" : "1px solid rgba(255,255,255,0.12)",
+                  background: selected
+                    ? "linear-gradient(90deg,var(--accent),var(--accent-2))"
+                    : cell.hasSlots
+                      ? "rgba(68,215,182,0.16)"
+                      : "transparent",
+                  color: "var(--text)",
+                  cursor: "pointer",
+                  fontWeight: cell.hasSlots ? 700 : 500,
+                }}
+              >
+                {cell.day}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
+        {selectedDate ? (
+          <p className="small" style={{ textAlign: "left", margin: 0 }}>
+            Showing slots for {selectedDate}
+          </p>
+        ) : (
+          <p className="small" style={{ textAlign: "left", margin: 0 }}>
+            Select a day in the calendar to view slots.
+          </p>
+        )}
+
+        {selectedDateSlots.map((slot) => (
+          <div key={slot.id} style={{ border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, padding: 10 }}>
+            <p style={{ margin: 0 }}>
+              {slot.date} - {slot.shift_label || `${slot.start_time}-${slot.end_time}`}
+            </p>
+            <p style={{ margin: "6px 0" }}>Available: {String(slot.is_available)}</p>
+            <button className="btn" style={{ width: "auto", padding: "8px 12px" }} onClick={() => toggleSlotAvailability(slot)}>
+              Toggle Availability
+            </button>
+          </div>
+        ))}
+
+        {!slots.length && <p className="small">No generated slots available yet.</p>}
+        {Boolean(slots.length) && selectedDate && !selectedDateSlots.length && (
+          <p className="small">No generated slots on this date.</p>
+        )}
+      </div>
+    </div>
+  );
+}
