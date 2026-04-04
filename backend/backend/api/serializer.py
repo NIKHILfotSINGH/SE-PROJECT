@@ -298,3 +298,99 @@ class BookAppointmentSerializer(serializers.Serializer):
             status="pending",
             reason=validated_data.get("reason", ""),
         )
+
+class RescheduleAppointmentSerializer(serializers.Serializer):
+    slot_id = serializers.IntegerField()
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        new_slot = DoctorSlot.objects.select_for_update().select_related("doctor", "doctor__user").filter(
+            id=validated_data["slot_id"]
+        ).first()
+        if not new_slot:
+            raise serializers.ValidationError({"slot_id": "Slot not found."})
+        if not new_slot.is_available:
+            raise serializers.ValidationError({"slot_id": "Slot is not available."})
+        if not new_slot.doctor.is_active:
+            raise serializers.ValidationError({"slot_id": "Doctor is not active."})
+
+        old_slot = instance.slot
+        old_slot.is_available = True
+        old_slot.save(update_fields=["is_available"])
+
+        new_slot.is_available = False
+        new_slot.save(update_fields=["is_available"])
+
+        instance.slot = new_slot
+        instance.doctor = new_slot.doctor
+        instance.status = "pending"
+        instance.save(update_fields=["slot", "doctor", "status", "updated_at"])
+        return instance
+
+
+class ConsultationReportSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.CharField(source="doctor.user.username", read_only=True)
+
+    class Meta:
+        model = ConsultationReport
+        fields = [
+            "id",
+            "appointment",
+            "doctor",
+            "doctor_name",
+            "diagnosis",
+            "prescription",
+            "notes",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["doctor", "appointment", "created_at", "updated_at"]
+
+
+class PatientMedicalProfileSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username", read_only=True)
+    first_name = serializers.CharField(source="user.first_name", required=False, allow_blank=True)
+    last_name = serializers.CharField(source="user.last_name", required=False, allow_blank=True)
+    email = serializers.EmailField(source="user.email", required=False, allow_blank=True)
+
+    class Meta:
+        model = PatientMedicalProfile
+        fields = [
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "mobile",
+            "age",
+            "gender",
+            "height_cm",
+            "weight_kg",
+            "disability_notes",
+            "blood_group",
+            "previous_diagnosis",
+            "allergies",
+            "chronic_conditions",
+            "current_medications",
+            "major_past_surgeries",
+        ]
+
+    def validate(self, attrs):
+        for field_name in MEDICAL_TEXT_NA_FIELDS:
+            if field_name not in attrs:
+                continue
+            value = attrs.get(field_name)
+            if value is None or not str(value).strip():
+                attrs[field_name] = "NA"
+        return attrs
+
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop("user", {})
+        for attr, value in user_data.items():
+            setattr(instance.user, attr, value)
+        if user_data:
+            instance.user.save(update_fields=list(user_data.keys()))
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
