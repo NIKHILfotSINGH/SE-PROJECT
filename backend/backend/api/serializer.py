@@ -159,7 +159,7 @@ class PatientMedicalProfileSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
-        class DoctorSlotSerializer(serializers.ModelSerializer):
+class DoctorSlotSerializer(serializers.ModelSerializer):
     doctor_id = serializers.IntegerField(source="doctor.id", read_only=True)
     shift_type = serializers.SerializerMethodField()
     shift_label = serializers.SerializerMethodField()
