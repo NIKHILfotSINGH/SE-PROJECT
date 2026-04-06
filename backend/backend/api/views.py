@@ -417,3 +417,160 @@ class AdminUserStatusUpdateView(APIView):
                 "user": AdminUserListSerializer(target_user).data,
             }
         )
+
+class DoctorWeeklyAvailabilityListCreateView(generics.ListCreateAPIView):
+    serializer_class = DoctorWeeklyAvailabilitySerializer
+    permission_classes = [permissions.IsAuthenticated, IsDoctor, IsProfileCompleted]
+
+    def get_queryset(self):
+        return DoctorWeeklyAvailability.objects.filter(doctor__user=self.request.user)
+
+    def _generate_slots_from_weekly(self, doctor, weekly_items, days=30):
+        for offset in range(days):
+            slot_date = date.today() + timedelta(days=offset)
+            weekday = slot_date.weekday()
+            for weekly in weekly_items:
+                if weekly.weekday != weekday:
+                    continue
+                DoctorSlot.objects.get_or_create(
+                    doctor=doctor,
+                    date=slot_date,
+                    start_time=weekly.start_time,
+                    end_time=weekly.end_time,
+                    defaults={"is_available": True},
+                )
+
+    def perform_create(self, serializer):
+        doctor = DoctorProfile.objects.get(user=self.request.user)
+        weekly_item = serializer.save(doctor=doctor)
+        if weekly_item.is_active:
+            self._generate_slots_from_weekly(doctor, [weekly_item])
+
+
+class DoctorWeeklyAvailabilityUpdateView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = DoctorWeeklyAvailabilitySerializer
+    permission_classes = [permissions.IsAuthenticated, IsDoctor, IsProfileCompleted]
+
+    def _generate_slots_from_weekly(self, doctor, weekly_items, days=30):
+        for offset in range(days):
+            slot_date = date.today() + timedelta(days=offset)
+            weekday = slot_date.weekday()
+            for weekly in weekly_items:
+                if weekly.weekday != weekday:
+                    continue
+                DoctorSlot.objects.get_or_create(
+                    doctor=doctor,
+                    date=slot_date,
+                    start_time=weekly.start_time,
+                    end_time=weekly.end_time,
+                    defaults={"is_available": True},
+                )
+
+    def perform_update(self, serializer):
+        weekly_item = serializer.save()
+        if weekly_item.is_active:
+            self._generate_slots_from_weekly(weekly_item.doctor, [weekly_item])
+
+    def get_queryset(self):
+        return DoctorWeeklyAvailability.objects.filter(doctor__user=self.request.user)
+
+
+class DoctorPublicSlotListView(generics.ListAPIView):
+    serializer_class = DoctorSlotSerializer
+    permission_classes = [permissions.IsAuthenticated, IsProfileCompleted]
+
+    def get_queryset(self):
+        doctor_id = self.kwargs["doctor_id"]
+        return DoctorSlot.objects.filter(
+            doctor_id=doctor_id,
+            doctor__is_active=True,
+            is_available=True,
+            date__gte=date.today(),
+        )
+
+class SlotListByDoctorView(generics.ListAPIView):
+    serializer_class = DoctorSlotSerializer
+    permission_classes = [permissions.IsAuthenticated, IsProfileCompleted]
+
+    def get_queryset(self):
+        doctor_id = self.request.query_params.get("doctor_id")
+        if not doctor_id:
+            return DoctorSlot.objects.none()
+        return DoctorSlot.objects.filter(
+            doctor_id=doctor_id,
+            doctor__is_active=True,
+            is_available=True,
+            date__gte=date.today(),
+        )
+
+class PatientHistoryForDoctorAdminView(generics.ListAPIView):
+    serializer_class = AppointmentSerializer
+    permission_classes = [permissions.IsAuthenticated, IsDoctorOrAdmin, IsProfileCompleted]
+
+    def get_queryset(self):
+        patient_id = self.kwargs["patient_id"]
+        qs = Appointment.objects.select_related("patient", "doctor", "doctor__user", "slot").filter(patient_id=patient_id)
+        if self.request.user.profile.role == "doctor":
+            return qs.filter(doctor__user=self.request.user)
+        return qs
+
+
+class DoctorHistoryForAdminView(generics.ListAPIView):
+    serializer_class = AppointmentSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get_queryset(self):
+        doctor_id = self.kwargs["doctor_id"]
+        return Appointment.objects.select_related("patient", "doctor", "doctor__user", "slot").filter(doctor_id=doctor_id)
+
+class AppointmentReportView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsProfileCompleted]
+
+    def get(self, request, appointment_id):
+        appointment = Appointment.objects.select_related("patient", "doctor", "doctor__user").filter(
+            id=appointment_id
+        ).first()
+        if not appointment:
+            return Response({"detail": "Appointment not found."}, status=404)
+
+        role = request.user.profile.role
+        allowed = (
+            (role == "patient" and appointment.patient_id == request.user.id)
+            or (role == "doctor" and appointment.doctor.user_id == request.user.id)
+            or role == "admin"
+        )
+        if not allowed:
+            return Response({"detail": "Not allowed."}, status=403)
+
+        report = ConsultationReport.objects.filter(appointment=appointment).select_related("doctor", "doctor__user").first()
+        if not report:
+            return Response({"detail": "No report yet."}, status=404)
+        return Response(ConsultationReportSerializer(report).data)
+
+    @transaction.atomic
+    def post(self, request, appointment_id):
+        if request.user.profile.role != "doctor":
+            return Response({"detail": "Only doctors can create reports."}, status=403)
+
+        appointment = Appointment.objects.select_related("doctor", "doctor__user").filter(id=appointment_id).first()
+        if not appointment or appointment.doctor.user_id != request.user.id:
+            return Response({"detail": "Appointment not found for this doctor."}, status=404)
+
+        doctor_profile = DoctorProfile.objects.get(user=request.user)
+        report, _ = ConsultationReport.objects.get_or_create(appointment=appointment, defaults={"doctor": doctor_profile, "diagnosis": ""})
+
+        serializer = ConsultationReportSerializer(instance=report, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        diagnosis_text = (serializer.validated_data.get("diagnosis") or report.diagnosis or "").strip()
+        if not diagnosis_text:
+            return Response({"diagnosis": ["Diagnosis is required."]}, status=400)
+
+        serializer.save(doctor=doctor_profile, appointment=appointment, diagnosis=diagnosis_text)
+
+        patient_profile, _ = PatientMedicalProfile.objects.get_or_create(user=appointment.patient)
+        patient_profile.previous_diagnosis = diagnosis_text
+        patient_profile.save(update_fields=["previous_diagnosis"])
+
+        appointment.status = "completed"
+        appointment.save(update_fields=["status", "updated_at"])
+        return Response(serializer.data)
