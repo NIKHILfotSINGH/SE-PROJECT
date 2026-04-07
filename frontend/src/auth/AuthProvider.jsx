@@ -12,7 +12,11 @@ export function AuthProvider({ children }) {
     const session = getStoredSession();
     if (session.access && session.role) {
       setAccessToken(session.access);
-      setUser({ username: session.username, role: session.role });
+      setUser({
+        username: session.username,
+        role: session.role,
+        profile_completed: session.profileCompleted,
+      });
     }
     setLoading(false);
   }, []);
@@ -24,7 +28,11 @@ export function AuthProvider({ children }) {
     async login(username, password) {
       const data = await login(username, password);
       setAccessToken(data.access);
-      setUser({ username: data.username, role: data.role });
+      setUser({
+        username: data.username,
+        role: data.role,
+        profile_completed: Boolean(data.profile_completed),
+      });
       return data;
     },
     async register(username, password, role) {
@@ -34,6 +42,10 @@ export function AuthProvider({ children }) {
       logout();
       setAccessToken(null);
       setUser(null);
+    },
+    setProfileCompletion(profileCompleted) {
+      setUser((prev) => (prev ? { ...prev, profile_completed: profileCompleted } : prev));
+      localStorage.setItem("profile_completed", profileCompleted ? "1" : "0");
     },
   }), [user, accessToken, loading]);
 
