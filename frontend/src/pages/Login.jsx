@@ -19,6 +19,19 @@ export default function Login() {
 
   const from = location.state?.from?.pathname;
 
+  useEffect(() => {
+    if (loading || !accessToken || !user) return;
+
+    if (from && from !== "/login" && from !== "/register") {
+      navigate(from, { replace: true });
+      return;
+    }
+
+    if (user.role === "doctor") navigate("/doctor/appointments", { replace: true });
+    else if (user.role === "admin") navigate("/admin/overview", { replace: true });
+    else navigate("/patient/search", { replace: true });
+  }, [loading, accessToken, user, from, navigate]);  
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");

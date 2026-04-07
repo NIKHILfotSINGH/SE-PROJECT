@@ -30,8 +30,11 @@ export default function Register() {
     setSuccess("");
     try {
       await register(username, password, role);
-      setSuccess("Account created. Please sign in.");
-      setTimeout(() => navigate("/login"), 500);
+      const session = await login(username, password);
+      setSuccess("Account created and signed in.");
+      if (session.role === "doctor") navigate("/doctor/profile", { replace: true });
+      else if (session.role === "admin") navigate("/admin/overview", { replace: true });
+      else navigate("/patient/profile", { replace: true });
     } catch (err) {
       setError(getErrorMessage(err));
     }
