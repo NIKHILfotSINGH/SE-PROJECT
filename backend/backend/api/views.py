@@ -602,3 +602,51 @@ class AppointmentReportView(APIView):
         appointment.status = "completed"
         appointment.save(update_fields=["status", "updated_at"])
         return Response(serializer.data)
+
+class TodayAppointmentsView(generics.ListAPIView):
+    serializer_class = AppointmentSerializer
+    permission_classes = [permissions.IsAuthenticated, IsDoctorOrAdmin, IsProfileCompleted]
+
+    def get_queryset(self):
+        base_qs = Appointment.objects.select_related("patient", "doctor", "doctor__user", "slot").filter(
+            slot__date=date.today()
+        )
+        if self.request.user.profile.role == "doctor":
+            return base_qs.filter(doctor__user=self.request.user)
+        return base_qs
+
+
+class AdminDashboardSummaryView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+
+    def get(self, request):
+        limit_raw = request.query_params.get("limit", "20")
+        try:
+            limit = int(limit_raw)
+        except (TypeError, ValueError):
+            limit = 20
+        limit = max(1, min(limit, 50))
+
+        recent_appointments = Appointment.objects.select_related(
+            "patient", "doctor", "doctor__user", "slot"
+        ).order_by("-created_at")[:limit]
+
+        summary = {
+            "total_doctors": DoctorProfile.objects.filter(is_active=True).count(),
+            "total_patients": User.objects.filter(profile__role="patient").count(),
+            "appointments_today": Appointment.objects.filter(slot__date=date.today()).count(),
+            "recent_appointments": AppointmentSerializer(recent_appointments, many=True).data,
+        }
+        return Response(summary)
+
+class PatientMedicalProfileByIdView(generics.RetrieveAPIView):
+    serializer_class = PatientMedicalProfileSerializer
+    permission_classes = [permissions.IsAuthenticated, IsDoctorOrAdmin, IsProfileCompleted]
+
+    def get_object(self):
+        patient_id = self.kwargs["patient_id"]
+        patient = User.objects.filter(id=patient_id).first()
+        if not patient:
+            raise Http404
+        obj, _ = PatientMedicalProfile.objects.get_or_create(user=patient)
+        return obj
