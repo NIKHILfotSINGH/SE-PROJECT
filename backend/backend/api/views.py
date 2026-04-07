@@ -3,11 +3,39 @@ from datetime import date, timedelta
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import Q
+from django.http import Http404
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
-
+from .models import (
+    Appointment,
+    ConsultationReport,
+    DoctorProfile,
+    DoctorSlot,
+    DoctorWeeklyAvailability,
+    PatientMedicalProfile,
+)
+from .permissions import IsAdmin, IsDoctor, IsDoctorOrAdmin, IsPatient, IsProfileCompleted
+from .serializer import (
+    AdminUserDetailSerializer,
+    AdminDoctorCreateSerializer,
+    AdminUserListSerializer,
+    AdminUserStatusSerializer,
+    AppointmentSerializer,
+    AppointmentStatusUpdateSerializer,
+    BookAppointmentSerializer,
+    ConsultationReportSerializer,
+    CustomTokenObtainPairSerializer,
+    DoctorProfileSerializer,
+    DoctorSlotSerializer,
+    DoctorWeeklyAvailabilitySerializer,
+    PatientMedicalProfileSerializer,
+    RegisterSerializer,
+    RescheduleAppointmentSerializer,
+    is_doctor_profile_complete,
+    is_patient_profile_complete,
+)
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()

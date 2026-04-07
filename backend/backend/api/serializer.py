@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from datetime import time
 from django.db import transaction
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -11,6 +12,34 @@ from .models import (
     PatientMedicalProfile,
     UserProfile,
 )
+
+
+SHIFT_WINDOWS = {
+    "morning": (time(9, 0), time(12, 0)),
+    "evening": (time(13, 0), time(16, 0)),
+    "night": (time(18, 0), time(21, 0)),
+}
+
+SHIFT_LABELS = {
+    "morning": "Morning (09:00-12:00)",
+    "evening": "Evening (13:00-16:00)",
+    "night": "Night (18:00-21:00)",
+}
+
+MEDICAL_TEXT_NA_FIELDS = (
+    "allergies",
+    "chronic_conditions",
+    "current_medications",
+    "major_past_surgeries",
+)
+
+
+def infer_shift_type(start_time, end_time):
+    for shift_type, (start, end) in SHIFT_WINDOWS.items():
+        if start_time == start and end_time == end:
+            return shift_type
+    return "custom"
+
 
 class RegisterSerializer(serializers.ModelSerializer):
     role = serializers.ChoiceField(choices=UserProfile.ROLE_CHOICES, write_only=True)
@@ -394,3 +423,104 @@ class PatientMedicalProfileSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+class AdminDoctorCreateSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    password = serializers.CharField(write_only=True, min_length=8)
+    speciality = serializers.CharField()
+    experience_years = serializers.IntegerField(min_value=0)
+    qualification = serializers.CharField(required=False, allow_blank=True)
+    bio = serializers.CharField(required=False, allow_blank=True)
+
+    @transaction.atomic
+    def create(self, validated_data):
+        username = validated_data.pop("username")
+        password = validated_data.pop("password")
+
+        if User.objects.filter(username=username).exists():
+            raise serializers.ValidationError({"username": "Username already exists."})
+
+        user = User.objects.create_user(username=username, password=password)
+        UserProfile.objects.create(user=user, role="doctor")
+        return DoctorProfile.objects.create(user=user, **validated_data)
+
+
+class AdminUserListSerializer(serializers.ModelSerializer):
+    role = serializers.CharField(source="profile.role", read_only=True)
+    doctor_speciality = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "role",
+            "is_active",
+            "doctor_speciality",
+        ]
+
+    def get_doctor_speciality(self, obj):
+        doctor_profile = getattr(obj, "doctor_profile", None)
+        if not doctor_profile:
+            return ""
+        return doctor_profile.speciality
+
+
+class AdminUserDetailSerializer(serializers.ModelSerializer):
+    role = serializers.CharField(source="profile.role", read_only=True)
+    doctor_profile = serializers.SerializerMethodField()
+    patient_profile = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "date_joined",
+            "is_active",
+            "role",
+            "doctor_profile",
+            "patient_profile",
+        ]
+
+    def get_doctor_profile(self, obj):
+        doctor_profile = getattr(obj, "doctor_profile", None)
+        if not doctor_profile:
+            return None
+        return {
+            "speciality": doctor_profile.speciality,
+            "experience_years": doctor_profile.experience_years,
+            "age": doctor_profile.age,
+            "qualification": doctor_profile.qualification,
+            "bio": doctor_profile.bio,
+            "is_active": doctor_profile.is_active,
+        }
+
+    def get_patient_profile(self, obj):
+        patient_profile = getattr(obj, "medical_profile", None)
+        if not patient_profile:
+            return None
+        return {
+            "mobile": patient_profile.mobile,
+            "age": patient_profile.age,
+            "gender": patient_profile.gender,
+            "blood_group": patient_profile.blood_group,
+            "height_cm": patient_profile.height_cm,
+            "weight_kg": patient_profile.weight_kg,
+            "disability_notes": patient_profile.disability_notes,
+            "previous_diagnosis": patient_profile.previous_diagnosis,
+            "allergies": patient_profile.allergies,
+            "chronic_conditions": patient_profile.chronic_conditions,
+            "current_medications": patient_profile.current_medications,
+            "major_past_surgeries": patient_profile.major_past_surgeries,
+        }
+
+
+class AdminUserStatusSerializer(serializers.Serializer):
+    is_active = serializers.BooleanField()
