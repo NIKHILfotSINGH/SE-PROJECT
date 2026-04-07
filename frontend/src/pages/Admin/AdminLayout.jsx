@@ -3,7 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../../auth/AuthProvider";
 import ThemeToggle from "../../components/ThemeToggle";
 
-export default function DoctorLayout() {
+export default function AdminLayout() {
   const { user, logout } = useAuth();
 
   const navStyle = ({ isActive }) => ({
@@ -22,13 +22,12 @@ export default function DoctorLayout() {
       <div className="dashboard">
         <div className="navbar" style={{ gap: 12 }}>
           <div>
-            <h2 style={{ margin: 0 }}>Doctor Portal</h2>
-            <p style={{ margin: 0, fontSize: 14 }}>Hello, {user?.username || "Doctor"}. Your role is {user?.role}.</p>
+            <h2 style={{ margin: 0 }}>Admin Portal</h2>
+            <p style={{ margin: 0, fontSize: 14 }}>Hello, {user?.username || "Admin"}. Your role is {user?.role}.</p>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <NavLink style={navStyle} to="/doctor/appointments">Appointments</NavLink>
-            <NavLink style={navStyle} to="/doctor/slots">Slots</NavLink>
-            <NavLink style={navStyle} to="/doctor/profile">Profile</NavLink>
+            <NavLink style={navStyle} to="/admin/overview">Overview</NavLink>
+            <NavLink style={navStyle} to="/admin/users">Users</NavLink>
             <ThemeToggle />
             <button className="btn" onClick={logout} style={{ width: "auto", padding: "10px 16px" }}>Logout</button>
           </div>
