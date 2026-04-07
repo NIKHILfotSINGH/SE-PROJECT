@@ -18,15 +18,19 @@ const tokenStore = {
     if (val) localStorage.setItem("refresh", val);
     else localStorage.removeItem("refresh");
   },
-  setUser({ username, role }) {
+  setUser({ username, role, profile_completed }) {
     if (username) localStorage.setItem("username", username);
     if (role) localStorage.setItem("role", role);
+    if (typeof profile_completed === "boolean") {
+      localStorage.setItem("profile_completed", profile_completed ? "1" : "0");
+    }
   },
   clear() {
     localStorage.removeItem("access");
     localStorage.removeItem("refresh");
     localStorage.removeItem("role");
     localStorage.removeItem("username");
+    localStorage.removeItem("profile_completed");
   },
 };
 
@@ -82,7 +86,11 @@ export async function login(username, password) {
   const { data } = await api.post("/api/auth/login/", { username, password });
   tokenStore.access = data.access;
   tokenStore.refresh = data.refresh;
-  tokenStore.setUser({ username: data.username, role: data.role });
+  tokenStore.setUser({
+    username: data.username,
+    role: data.role,
+    profile_completed: Boolean(data.profile_completed),
+  });
   return data;
 }
 
@@ -108,7 +116,8 @@ export function getStoredSession() {
   const refresh = tokenStore.refresh;
   const role = localStorage.getItem("role");
   const username = localStorage.getItem("username");
-  return { access, refresh, role, username };
+  const profileCompleted = localStorage.getItem("profile_completed") === "1";
+  return { access, refresh, role, username, profileCompleted };
 }
 
 export default api;
