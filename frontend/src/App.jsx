@@ -9,11 +9,11 @@ import PatientAppointmentsPage from "./pages/patient/PatientAppointmentsPage";
 import PatientProfilePage from "./pages/patient/PatientProfilePage";
 import DoctorLayout from "./pages/doctor/DoctorLayout";
 import DoctorProfilePage from "./pages/doctor/DoctorProfilePage";
-import DoctorSlotsPage from "./pages/doctor/DoctorSlotsPage";
-import DoctorAppointmentsPage from "./pages/doctor/DoctorAppointmentsPage";
-import AdminLayout from "./pages/admin/AdminLayout";
-import AdminOverviewPage from "./pages/admin/AdminOverviewPage";
-import AdminUsersPage from "./pages/admin/AdminPatientsPage";
+import DoctorSlotsPage from "./pages/doctor/DoctorSlotsPages";
+import DoctorAppointmentsPage from "./pages/doctor/DoctorAppointmentPage";
+import AdminLayout from "./pages/Admin/AdminLayout";
+import AdminOverviewPage from "./pages/Admin/AdminOverviewPage";
+import AdminUsersPage from "./pages/Admin/AdminPatientsPage";
 
 export default function App() {
   return (

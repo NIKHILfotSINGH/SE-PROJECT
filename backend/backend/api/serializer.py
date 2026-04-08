@@ -79,14 +79,16 @@ def is_patient_profile_complete(user, medical_profile):
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
+        profile, _ = UserProfile.objects.get_or_create(user=user, defaults={"role": "patient"})
         token = super().get_token(user)
-        token["role"] = user.profile.role
-        token["profile_completed"] = user.profile.profile_completed
+        token["role"] = profile.role
+        token["profile_completed"] = profile.profile_completed
         return token
 
     def validate(self, attrs):
         data = super().validate(attrs)
-        role = self.user.profile.role
+        profile, _ = UserProfile.objects.get_or_create(user=self.user, defaults={"role": "patient"})
+        role = profile.role
         is_complete = role == "admin"
         if role == "doctor":
             doctor_profile = DoctorProfile.objects.filter(user=self.user).first()
@@ -95,11 +97,11 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             medical_profile, _ = PatientMedicalProfile.objects.get_or_create(user=self.user)
             is_complete = is_patient_profile_complete(self.user, medical_profile)
 
-        if self.user.profile.profile_completed != is_complete:
-            self.user.profile.profile_completed = is_complete
-            self.user.profile.save(update_fields=["profile_completed"])
+        if profile.profile_completed != is_complete:
+            profile.profile_completed = is_complete
+            profile.save(update_fields=["profile_completed"])
 
-        data["role"] = self.user.profile.role
+        data["role"] = profile.role
         data["username"] = self.user.username
         data["profile_completed"] = is_complete
         return data

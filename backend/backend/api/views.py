@@ -200,6 +200,25 @@ class AppointmentCancelView(APIView):
         appointment.slot.save(update_fields=["is_available"])
         return Response({"detail": "Appointment cancelled."})
 
+
+class AppointmentHideForPatientView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsPatient, IsProfileCompleted]
+
+    def patch(self, request, appointment_id):
+        appointment = Appointment.objects.select_related("patient").filter(id=appointment_id).first()
+        if not appointment:
+            return Response({"detail": "Appointment not found."}, status=404)
+
+        if appointment.patient_id != request.user.id:
+            return Response({"detail": "Not allowed to hide this appointment."}, status=403)
+
+        if appointment.is_hidden_for_patient:
+            return Response({"detail": "Appointment is already hidden."}, status=400)
+
+        appointment.is_hidden_for_patient = True
+        appointment.save(update_fields=["is_hidden_for_patient", "updated_at"])
+        return Response({"detail": "Appointment hidden from patient view."})
+
 class AppointmentUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsProfileCompleted]
 
