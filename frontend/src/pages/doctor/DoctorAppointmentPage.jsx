@@ -8,6 +8,7 @@ import {
   rescheduleAppointment,
   upsertAppointmentReport,
 } from "../../services/hospitalApi";
+import AppointmentCard from "../../components/AppointmentCard";
 
 const CURRENT_STATUSES = new Set(["pending", "confirmed"]);
 const PAST_STATUSES = new Set(["completed", "cancelled"]);
@@ -150,20 +151,20 @@ export default function DoctorAppointmentsPage() {
 
   return (
     <div>
-      <h3>Appointments</h3>
+      <h3 className="doctor-section-heading">Appointments</h3>
       <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         <button
           type="button"
-          className="btn"
-          style={{ width: "auto", padding: "8px 12px", opacity: activeTab === "current" ? 1 : 0.7 }}
+          className={`btn ${activeTab === "current" ? "btn-toggle-active" : "btn-toggle-inactive"}`}
+          style={{ width: "auto", padding: "8px 12px" }}
           onClick={() => setActiveTab("current")}
         >
           Current / Upcoming
         </button>
         <button
           type="button"
-          className="btn"
-          style={{ width: "auto", padding: "8px 12px", opacity: activeTab === "past" ? 1 : 0.7 }}
+          className={`btn ${activeTab === "past" ? "btn-toggle-active" : "btn-toggle-inactive"}`}
+          style={{ width: "auto", padding: "8px 12px" }}
           onClick={() => setActiveTab("past")}
         >
           Past
@@ -180,8 +181,8 @@ export default function DoctorAppointmentsPage() {
           <button
             key={value}
             type="button"
-            className="btn"
-            style={{ width: "auto", padding: "8px 12px", opacity: timeRange === value ? 1 : 0.72 }}
+            className={`btn ${timeRange === value ? "btn-toggle-active" : "btn-toggle-inactive"}`}
+            style={{ width: "auto", padding: "8px 12px" }}
             onClick={() => setTimeRange(value)}
           >
             {label}
@@ -202,37 +203,50 @@ export default function DoctorAppointmentsPage() {
           const editable = CURRENT_STATUSES.has(appt.status);
           const isSaving = Boolean(savingReports[appt.id]);
 
-          return (
-            <div key={appt.id} style={{ border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, padding: 12 }}>
-              <p style={{ margin: 0 }}>Patient: {appt.patient_name} (ID: {appt.patient})</p>
-              <p style={{ margin: "6px 0" }}>
-                Date/Time: {appt.slot_date} {appt.slot_start_time} - {appt.slot_end_time}
-              </p>
-              <p style={{ margin: "6px 0" }}>Status: {appt.status}</p>
-              <p style={{ margin: "6px 0" }}>Symptoms: {appt.reason || "Not provided"}</p>
+          const actionButtons = [];
+          
+          if (editable) {
+            actionButtons.push(
+              <button
+                key="profile"
+                className="btn btn-secondary"
+                style={{ width: "auto", padding: "8px 12px" }}
+                onClick={() => handleViewPatientProfile(appt)}
+              >
+                View Patient Profile
+              </button>
+            );
+            actionButtons.push(
+              <button
+                key="reschedule"
+                className="btn btn-secondary"
+                style={{ width: "auto", padding: "8px 12px" }}
+                onClick={() => setOpenRescheduleId((prev) => (prev === appt.id ? null : appt.id))}
+              >
+                {openRescheduleId === appt.id ? "Hide Reschedule" : "Reschedule"}
+              </button>
+            );
+            actionButtons.push(
+              <button
+                key="cancel"
+                className="btn btn-danger"
+                style={{ width: "auto", padding: "8px 12px" }}
+                onClick={() => handleCancel(appt.id)}
+              >
+                Cancel
+              </button>
+            );
+          }
 
+          return (
+            <AppointmentCard
+              key={appt.id}
+              appointment={appt}
+              isDoctor={true}
+              actions={actionButtons}
+            >
               {editable && (
                 <>
-                  <div style={{ marginBottom: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button
-                      className="btn"
-                      style={{ width: "auto", padding: "8px 12px" }}
-                      onClick={() => handleViewPatientProfile(appt)}
-                    >
-                      View Patient Profile
-                    </button>
-                    <button
-                      className="btn"
-                      style={{ width: "auto", padding: "8px 12px" }}
-                      onClick={() => setOpenRescheduleId((prev) => (prev === appt.id ? null : appt.id))}
-                    >
-                      {openRescheduleId === appt.id ? "Hide Reschedule" : "Reschedule"}
-                    </button>
-                    <button className="btn" style={{ width: "auto", padding: "8px 12px" }} onClick={() => handleCancel(appt.id)}>
-                      Cancel
-                    </button>
-                  </div>
-
                   {openRescheduleId === appt.id && (
                     <div className="form-group" style={{ marginBottom: 8 }}>
                       <label>Reschedule to your slot</label>
@@ -250,7 +264,7 @@ export default function DoctorAppointmentsPage() {
                           ))}
                       </select>
                       <button
-                        className="btn"
+                        className="btn btn-secondary"
                         style={{ width: "auto", padding: "8px 12px", marginTop: 8 }}
                         disabled={!rescheduleMap[appt.id]}
                         onClick={() => handleReschedule(appt.id)}
@@ -261,7 +275,7 @@ export default function DoctorAppointmentsPage() {
                   )}
 
                   <div className="form-group">
-                    <label>Diagnosis *</label>
+                    <label className="appointment-card-label">Diagnosis *</label>
                     <textarea
                       value={reportDraft.diagnosis}
                       onChange={(e) =>
@@ -274,17 +288,19 @@ export default function DoctorAppointmentsPage() {
                       required
                     />
                   </div>
-                  <button
-                    className="btn"
-                    style={{ width: "auto", padding: "8px 12px" }}
-                    disabled={isSaving}
-                    onClick={() => handleSaveReport(appt)}
-                  >
-                    {isSaving ? "Saving..." : "Save Report"}
-                  </button>
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <button
+                      className="btn btn-primary"
+                      style={{ width: "auto", padding: "8px 12px" }}
+                      disabled={isSaving}
+                      onClick={() => handleSaveReport(appt)}
+                    >
+                      {isSaving ? "Saving..." : "Save Report"}
+                    </button>
+                  </div>
                 </>
               )}
-            </div>
+            </AppointmentCard>
           );
         })}
 
@@ -324,7 +340,7 @@ export default function DoctorAppointmentsPage() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
               <h4 style={{ margin: 0 }}>Patient Profile: {patientProfileModal.patientName}</h4>
-              <button className="btn" style={{ width: "auto", padding: "6px 10px" }} onClick={closePatientProfileModal}>
+              <button className="btn btn-slate" style={{ width: "auto", padding: "6px 10px" }} onClick={closePatientProfileModal}>
                 Close
               </button>
             </div>

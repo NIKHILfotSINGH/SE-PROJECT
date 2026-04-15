@@ -7,6 +7,7 @@ import {
   hideAppointmentForPatient,
   rescheduleAppointment,
 } from "../../services/hospitalApi";
+import AppointmentCard from "../../components/AppointmentCard";
 
 export default function PatientAppointmentsPage() {
   const [appointments, setAppointments] = React.useState([]);
@@ -116,65 +117,82 @@ export default function PatientAppointmentsPage() {
           const slots = slotsByDoctor[appt.doctor] || [];
           const canModify = ["pending", "confirmed"].includes(appt.status) && appt.slot_date >= todayIso;
           const canDelete = ["cancelled", "completed"].includes(appt.status) || appt.slot_date < todayIso;
-          return (
-            <div key={appt.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 12, background: "var(--surface)" }}>
-              <p style={{ margin: 0 }}>Doctor: {appt.doctor_name} ({appt.doctor_speciality})</p>
-              <p style={{ margin: "6px 0" }}>Date/Time: {appt.slot_date} {appt.slot_start_time} - {appt.slot_end_time}</p>
-              <p style={{ margin: "6px 0" }}>Status: {appt.status}</p>
-              <p style={{ margin: "6px 0" }}>Symptoms: {appt.reason || "Not provided"}</p>
-              {canModify ? (
-                <>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button
-                      className="btn"
-                      style={{ width: "auto", padding: "8px 12px" }}
-                      onClick={() => handleToggleReschedule(appt)}
-                    >
-                      {openRescheduleId === appt.id ? "Hide Reschedule" : "Reschedule"}
-                    </button>
-                    <button className="btn" style={{ width: "auto", padding: "8px 12px" }} onClick={() => handleCancel(appt.id)}>
-                      Cancel
-                    </button>
-                  </div>
+          
+          const actionButtons = [];
+          
+          if (canModify) {
+            actionButtons.push(
+              <button
+                key="reschedule"
+                className="btn"
+                style={{ width: "auto", padding: "8px 12px" }}
+                onClick={() => handleToggleReschedule(appt)}
+              >
+                {openRescheduleId === appt.id ? "Hide Reschedule" : "Reschedule"}
+              </button>
+            );
+            actionButtons.push(
+              <button
+                key="cancel"
+                className="btn"
+                style={{ width: "auto", padding: "8px 12px" }}
+                onClick={() => handleCancel(appt.id)}
+              >
+                Cancel
+              </button>
+            );
+          }
+          
+          if (canDelete) {
+            actionButtons.push(
+              <button
+                key="delete"
+                className="btn"
+                style={{ width: "auto", padding: "8px 12px" }}
+                onClick={() => handleDelete(appt.id)}
+              >
+                Delete
+              </button>
+            );
+          }
 
-                  {openRescheduleId === appt.id && (
-                    <div className="form-group" style={{ marginTop: 10, marginBottom: 4 }}>
-                      <label>Reschedule to slot</label>
-                      <select
-                        value={rescheduleMap[appt.id] || ""}
-                        onChange={(e) => setRescheduleMap((prev) => ({ ...prev, [appt.id]: e.target.value }))}
-                      >
-                        <option value="">Choose slot</option>
-                        {slots.map((slot) => (
-                          <option key={slot.id} value={slot.id}>
-                            {slot.date} - {slot.shift_label || `${slot.start_time} - ${slot.end_time}`}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        className="btn"
-                        style={{ width: "auto", padding: "8px 12px", marginTop: 8 }}
-                        disabled={!rescheduleMap[appt.id]}
-                        onClick={() => handleReschedule(appt.id)}
-                      >
-                        Confirm Reschedule
-                      </button>
-                    </div>
-                  )}
-                </>
-              ) : (
+          return (
+            <AppointmentCard
+              key={appt.id}
+              appointment={appt}
+              isDoctor={false}
+              actions={actionButtons}
+            >
+              {canModify && openRescheduleId === appt.id && (
+                <div className="form-group">
+                  <label>Reschedule to slot</label>
+                  <select
+                    value={rescheduleMap[appt.id] || ""}
+                    onChange={(e) => setRescheduleMap((prev) => ({ ...prev, [appt.id]: e.target.value }))}
+                  >
+                    <option value="">Choose slot</option>
+                    {slots.map((slot) => (
+                      <option key={slot.id} value={slot.id}>
+                        {slot.date} - {slot.shift_label || `${slot.start_time} - ${slot.end_time}`}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="btn"
+                    style={{ width: "auto", padding: "8px 12px", marginTop: 8 }}
+                    disabled={!rescheduleMap[appt.id]}
+                    onClick={() => handleReschedule(appt.id)}
+                  >
+                    Confirm Reschedule
+                  </button>
+                </div>
+              )}
+              {!canModify && !canDelete && (
                 <p className="small" style={{ textAlign: "left", marginBottom: 0 }}>
                   This appointment can no longer be cancelled or rescheduled.
                 </p>
               )}
-              {canDelete && (
-                <div style={{ marginTop: 10 }}>
-                  <button className="btn" style={{ width: "auto", padding: "8px 12px" }} onClick={() => handleDelete(appt.id)}>
-                    Delete
-                  </button>
-                </div>
-              )}
-            </div>
+            </AppointmentCard>
           );
         })}
         {!appointments.length && !loading && <p className="small">No appointments yet.</p>}

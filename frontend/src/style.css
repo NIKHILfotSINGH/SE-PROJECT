@@ -66,6 +66,11 @@ body {
   transition: background-color 0.25s ease, color 0.2s ease;
 }
 
+.theme-light body,
+.light-mode body {
+  background: linear-gradient(135deg, #f0f4ff 0%, #e8f5f0 50%, #f5f0ff 100%);
+}
+
 a { color: var(--accent); text-decoration: none; }
 button { cursor: pointer; }
 
@@ -107,13 +112,146 @@ select option { color: var(--text); background: var(--card); }
   width: 100%;
   padding: 12px 14px;
   border: none;
-  border-radius: 12px;
-  font-weight: 700;
+  border-radius: 8px;
+  font-weight: 600;
   font-size: 15px;
   letter-spacing: 0.2px;
   color: #0b1021;
   background: linear-gradient(120deg, var(--accent) 0%, var(--accent-2) 100%);
   box-shadow: 0 14px 34px rgba(32,210,196,0.35);
+}
+
+.theme-light .btn,
+.light-mode .btn {
+  color: #ffffff;
+  background: #0d9488;
+  border: 1.5px solid #0d9488;
+  box-shadow: none;
+}
+
+.theme-light .btn.btn-primary,
+.light-mode .btn.btn-primary {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.theme-light .btn.btn-secondary,
+.light-mode .btn.btn-secondary {
+  background: #0d9488;
+  border-color: #0d9488;
+  color: #ffffff;
+}
+
+.theme-light .btn.btn-danger,
+.light-mode .btn.btn-danger {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #ffffff;
+}
+
+.theme-light .btn.btn-toggle-inactive,
+.light-mode .btn.btn-toggle-inactive {
+  background: transparent;
+  border: 1.5px solid #0d9488;
+  color: #0d9488;
+}
+
+.theme-light .btn.btn-toggle-active,
+.light-mode .btn.btn-toggle-active {
+  background: #0d9488;
+  border: 1.5px solid #0d9488;
+  color: #ffffff;
+}
+
+.theme-light .btn.btn-slate,
+.light-mode .btn.btn-slate {
+  background: #1e293b;
+  border-color: #1e293b;
+  color: #ffffff;
+}
+
+.portal-nav-link,
+.doctor-nav-link {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  text-decoration: none;
+  color: var(--text);
+  background: transparent;
+  box-shadow: none;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.theme-light .portal-nav-link-active,
+.theme-light .doctor-nav-link-active,
+.light-mode .portal-nav-link-active,
+.light-mode .doctor-nav-link-active {
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  color: #2563eb;
+}
+
+.theme-light .portal-nav-link,
+.theme-light .doctor-nav-link,
+.light-mode .portal-nav-link,
+.light-mode .doctor-nav-link {
+  color: #475569;
+  background: transparent;
+  border-color: transparent;
+}
+
+.theme-light .portal-nav-link:hover,
+.theme-light .doctor-nav-link:hover,
+.light-mode .portal-nav-link:hover,
+.light-mode .doctor-nav-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: transparent;
+}
+
+.theme-dark .portal-nav-link-active,
+.theme-dark .portal-nav-link:hover,
+.theme-dark .doctor-nav-link-active,
+.theme-dark .doctor-nav-link:hover {
+  border-color: var(--accent);
+  background: rgba(111, 124, 255, 0.12);
+}
+
+.theme-light .portal-title,
+.light-mode .portal-title,
+.theme-light .doctor-portal-title,
+.light-mode .doctor-portal-title {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.theme-light .portal-subtitle,
+.light-mode .portal-subtitle,
+.theme-light .doctor-portal-subtitle,
+.light-mode .doctor-portal-subtitle {
+  color: #64748b;
+}
+
+.theme-light .doctor-section-heading,
+.light-mode .doctor-section-heading {
+  color: #0f172a;
+}
+
+.theme-light .appointment-card-label,
+.light-mode .appointment-card-label {
+  color: #64748b;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.theme-light .appointment-card-value,
+.light-mode .appointment-card-value {
+  color: #0f172a;
+  font-weight: 600;
 }
 
 .small { font-size: 13px; color: var(--muted); text-align: center; }
@@ -131,6 +269,15 @@ select option { color: var(--text); background: var(--card); }
   padding: 12px 14px;
   box-shadow: 0 10px 24px rgba(0,0,0,0.28);
 }
+
+.theme-light .navbar,
+.light-mode .navbar {
+  background: #ffffff;
+  border: none;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
 .navbar h2 { margin: 0; letter-spacing: 0.2px; }
 
 .dashboard {

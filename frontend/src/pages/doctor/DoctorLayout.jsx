@@ -6,31 +6,25 @@ import ThemeToggle from "../../components/ThemeToggle";
 export default function DoctorLayout() {
   const { user, logout } = useAuth();
 
-  const navStyle = ({ isActive }) => ({
-    padding: "10px 14px",
-    borderRadius: 12,
-    border: "1px solid var(--border)",
-    textDecoration: "none",
-    color: "var(--text)",
-    background: isActive ? "linear-gradient(90deg,var(--accent),var(--accent-2))" : "var(--pill)",
-    boxShadow: isActive ? "0 8px 24px rgba(68,215,182,0.25)" : "none",
-    fontWeight: 600,
-  });
-
   return (
     <div className="app-shell">
       <div className="dashboard">
         <div className="navbar" style={{ gap: 12 }}>
           <div>
-            <h2 style={{ margin: 0 }}>Doctor Portal</h2>
-            <p style={{ margin: 0, fontSize: 14 }}>Hello, {user?.username || "Doctor"}. Your role is {user?.role}.</p>
+            <h2 className="portal-title" style={{ margin: 0 }}>Doctor Portal</h2>
+            <p className="portal-subtitle" style={{ margin: 0, fontSize: 12 }}>{user?.username?.split('@')[0] || "Doctor"} • {user?.role}</p>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <NavLink style={navStyle} to="/doctor/appointments">Appointments</NavLink>
-            <NavLink style={navStyle} to="/doctor/slots">Slots</NavLink>
-            <NavLink style={navStyle} to="/doctor/profile">Profile</NavLink>
-            <ThemeToggle />
-            <button className="btn" onClick={logout} style={{ width: "auto", padding: "10px 16px" }}>Logout</button>
+          <div style={{ display: "flex", gap: 16, alignItems: "center", marginLeft: "auto" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <NavLink className={({ isActive }) => `portal-nav-link${isActive ? " portal-nav-link-active" : ""}`} to="/doctor/appointments">Appointments</NavLink>
+              <NavLink className={({ isActive }) => `portal-nav-link${isActive ? " portal-nav-link-active" : ""}`} to="/doctor/slots">Slots</NavLink>
+              <NavLink className={({ isActive }) => `portal-nav-link${isActive ? " portal-nav-link-active" : ""}`} to="/doctor/profile">Profile</NavLink>
+            </div>
+            <div style={{ width: "1px", height: 24, background: "var(--border)" }} />
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <ThemeToggle />
+              <button className="btn btn-danger" onClick={logout} style={{ width: "auto", padding: "8px 16px", fontSize: 14 }} aria-label="Logout" title="Logout">⎋</button>
+            </div>
           </div>
         </div>
         <Outlet />
