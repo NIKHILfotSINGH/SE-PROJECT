@@ -6,8 +6,14 @@ import {
   getDoctorSlots,
   hideAppointmentForPatient,
   rescheduleAppointment,
-} from "../../services/hospitalApi";
+} from "../../services/HospitalApi";
 import AppointmentCard from "../../components/AppointmentCard";
+
+function getLocalDateIso() {
+  const now = new Date();
+  const offsetMs = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10);
+}
 
 export default function PatientAppointmentsPage() {
   const [appointments, setAppointments] = React.useState([]);
@@ -101,7 +107,7 @@ export default function PatientAppointmentsPage() {
       setError(getApiErrorMessage(err, "Failed to load slots for rescheduling"));
     }
   }
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = getLocalDateIso();
 
   return (
     <div>

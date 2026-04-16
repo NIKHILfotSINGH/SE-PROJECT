@@ -1,5 +1,5 @@
 import React from "react";
-import { bookAppointment, getApiErrorMessage, getDoctorSlots, getDoctors } from "../../services/hospitalApi";
+import { bookAppointment, getApiErrorMessage, getDoctorSlots, getDoctors } from "../../services/HospitalApi";
 
 export default function PatientSearchPage() {
   const [activeTab, setActiveTab] = React.useState("search");

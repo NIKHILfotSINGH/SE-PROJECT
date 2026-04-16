@@ -1,5 +1,5 @@
 import React from "react";
-import { getDoctorProfile, updateDoctorProfile } from "../../services/hospitalApi";
+import { getDoctorProfile, updateDoctorProfile } from "../../services/HospitalApi";
 import { useAuth } from "../../auth/AuthProvider";
 
 export default function DoctorProfilePage() {

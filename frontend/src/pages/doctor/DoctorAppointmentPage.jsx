@@ -7,7 +7,7 @@ import {
   getPatientMedicalProfileById,
   rescheduleAppointment,
   upsertAppointmentReport,
-} from "../../services/hospitalApi";
+} from "../../services/HospitalApi";
 import AppointmentCard from "../../components/AppointmentCard";
 
 const CURRENT_STATUSES = new Set(["pending", "confirmed"]);

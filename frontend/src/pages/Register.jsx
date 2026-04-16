@@ -71,7 +71,6 @@ export default function Register() {
             <select value={role} onChange={(e) => setRole(e.target.value)}>
               <option value="patient">Patient</option>
               <option value="doctor">Doctor</option>
-              <option value="admin">Admin</option>
             </select>
           </div>
           <button type="submit" className="btn">Create Account</button>

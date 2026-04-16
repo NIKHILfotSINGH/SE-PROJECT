@@ -120,7 +120,7 @@ class Appointment(models.Model):
 
     patient = models.ForeignKey(User, on_delete=models.CASCADE, related_name="patient_appointments")
     doctor = models.ForeignKey(DoctorProfile, on_delete=models.CASCADE, related_name="doctor_appointments")
-    slot = models.OneToOneField(DoctorSlot, on_delete=models.CASCADE, related_name="appointment")
+    slot = models.ForeignKey(DoctorSlot, on_delete=models.CASCADE, related_name="appointments")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     reason = models.TextField(blank=True)
     is_hidden_for_patient = models.BooleanField(default=False)

@@ -2,6 +2,7 @@ import axios from "axios";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 const api = axios.create({ baseURL: API_BASE, withCredentials: false });
+const refreshClient = axios.create({ baseURL: API_BASE, withCredentials: false });
 
 const tokenStore = {
   get access() {
@@ -47,7 +48,12 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const { config, response } = error;
-    if (!response || response.status !== 401 || config._retry) {
+    if (!config || !response || response.status !== 401 || config._retry) {
+      throw error;
+    }
+
+    if ((config.url || "").includes("/api/auth/refresh/")) {
+      tokenStore.clear();
       throw error;
     }
 
@@ -102,7 +108,7 @@ export async function register(username, password, role) {
 export async function refreshToken() {
   const refresh = tokenStore.refresh;
   if (!refresh) throw new Error("No refresh token available");
-  const { data } = await api.post("/api/auth/refresh/", { refresh });
+  const { data } = await refreshClient.post("/api/auth/refresh/", { refresh });
   tokenStore.access = data.access;
   return data.access;
 }

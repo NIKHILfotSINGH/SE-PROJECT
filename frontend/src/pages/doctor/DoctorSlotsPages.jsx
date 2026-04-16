@@ -5,7 +5,7 @@ import {
   getDoctorWeeklyAvailability,
   updateDoctorSlot,
   updateDoctorWeeklyAvailability,
-} from "../../services/hospitalApi";
+} from "../../services/HospitalApi";
 
 const WEEK_DAYS = [
   { value: 0, label: "Monday" },

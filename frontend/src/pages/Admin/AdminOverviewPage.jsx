@@ -6,7 +6,7 @@ import {
   getDoctorSlots,
   getDoctors,
   rescheduleAppointment,
-} from "../../services/hospitalApi";
+} from "../../services/HospitalApi";
 
 const DEFAULT_SUMMARY = {
   total_doctors: 0,
@@ -27,6 +27,12 @@ function toStatusLabel(status) {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
+function getLocalDateIso() {
+  const now = new Date();
+  const offsetMs = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - offsetMs).toISOString().slice(0, 10);
+}
+
 export default function AdminOverviewPage() {
   const [summary, setSummary] = React.useState(DEFAULT_SUMMARY);
   const [doctors, setDoctors] = React.useState([]);
@@ -39,7 +45,7 @@ export default function AdminOverviewPage() {
   const [message, setMessage] = React.useState("");
   const [error, setError] = React.useState("");
 
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = getLocalDateIso();
 
   const loadOverview = React.useCallback(async () => {
     try {
@@ -191,7 +197,12 @@ export default function AdminOverviewPage() {
               <tbody>
                 {summary.recent_appointments.map((appointment) => {
                   const statusClass = toStatusClass(appointment.status);
-                  const canManage = ["pending", "confirmed"].includes(statusClass) && (appointment.slot_date || "") >= todayIso;
+                  const isOpenStatus = ["pending", "confirmed"].includes(statusClass);
+                  const isPastAppointment = Boolean(appointment.slot_date) && appointment.slot_date < todayIso;
+                  const canManage = isOpenStatus && !isPastAppointment;
+                  const statusLabel = isPastAppointment && isOpenStatus
+                    ? `${toStatusLabel(statusClass)} (Past)`
+                    : toStatusLabel(statusClass);
                   const selectedDoctorId = rescheduleDoctorMap[appointment.id] || String(appointment.doctor || "");
                   const availableSlots = slotsByDoctor[String(selectedDoctorId)] || [];
                   const timeRange = appointment.slot_end_time
@@ -205,7 +216,7 @@ export default function AdminOverviewPage() {
                       <td>{timeRange}</td>
                       <td>
                         <span className={`admin-status-badge admin-status-${statusClass}`}>
-                          {toStatusLabel(statusClass)}
+                          {statusLabel}
                         </span>
                       </td>
                       <td>
@@ -275,7 +286,9 @@ export default function AdminOverviewPage() {
                             )}
                           </div>
                         ) : (
-                          <span className="small">No actions</span>
+                          <span className="small" title={isPastAppointment ? "Past appointments cannot be cancelled or rescheduled." : "No actions for this status."}>
+                            {isPastAppointment ? "Past appointment" : "No actions"}
+                          </span>
                         )}
                       </td>
                     </tr>

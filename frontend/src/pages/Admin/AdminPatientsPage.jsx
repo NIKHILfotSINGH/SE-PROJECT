@@ -4,7 +4,7 @@ import {
   getAdminUsers,
   getApiErrorMessage,
   setAdminUserStatus,
-} from "../../services/hospitalApi";
+} from "../../services/HospitalApi";
 
 export default function AdminUsersPage() {
   const [users, setUsers] = React.useState([]);

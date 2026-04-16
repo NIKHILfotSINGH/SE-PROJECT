@@ -2,7 +2,7 @@ from datetime import date, timedelta
 
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import Http404
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
@@ -33,9 +33,21 @@ from .serializer import (
     PatientMedicalProfileSerializer,
     RegisterSerializer,
     RescheduleAppointmentSerializer,
+    ACTIVE_SLOT_STATUSES,
+    APPOINTMENT_LIMIT_PER_SLOT,
+    get_slot_occupancy,
     is_doctor_profile_complete,
     is_patient_profile_complete,
 )
+
+
+def with_remaining_capacity(queryset):
+    return queryset.annotate(
+        active_appointments=Count(
+            "appointments",
+            filter=Q(appointments__status__in=ACTIVE_SLOT_STATUSES),
+        )
+    ).filter(active_appointments__lt=APPOINTMENT_LIMIT_PER_SLOT)
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -196,8 +208,6 @@ class AppointmentCancelView(APIView):
 
         appointment.status = "cancelled"
         appointment.save(update_fields=["status", "updated_at"])
-        appointment.slot.is_available = True
-        appointment.slot.save(update_fields=["is_available"])
         return Response({"detail": "Appointment cancelled."})
 
 
@@ -242,13 +252,22 @@ class AppointmentUpdateView(APIView):
         serializer = AppointmentStatusUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        previous_status = appointment.status
         status_value = serializer.validated_data["status"]
+
+        reactivating = previous_status == "cancelled" and status_value in {"pending", "confirmed"}
+        if reactivating:
+            if not appointment.slot.is_available:
+                return Response({"detail": "Slot is not available."}, status=400)
+            occupied = get_slot_occupancy(appointment.slot, exclude_appointment_id=appointment.id)
+            if occupied >= APPOINTMENT_LIMIT_PER_SLOT:
+                return Response(
+                    {"detail": f"Slot is full. Maximum {APPOINTMENT_LIMIT_PER_SLOT} appointments allowed."},
+                    status=400,
+                )
+
         appointment.status = status_value
         appointment.save(update_fields=["status", "updated_at"])
-
-        if status_value == "cancelled":
-            appointment.slot.is_available = True
-            appointment.slot.save(update_fields=["is_available"])
 
         return Response(AppointmentSerializer(appointment).data)
 class AppointmentRescheduleView(APIView):
@@ -277,7 +296,7 @@ class AppointmentRescheduleView(APIView):
         if appointment.slot.date < date.today():
             return Response({"detail": "Cannot reschedule a past appointment."}, status=400)
 
-        serializer = RescheduleAppointmentSerializer(instance=appointment, data=request.data)
+        serializer = RescheduleAppointmentSerializer(instance=appointment, data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         updated = serializer.save()
         return Response(AppointmentSerializer(updated).data)
@@ -346,31 +365,41 @@ class AdminDoctorRemoveView(APIView):
             status__in=["pending", "confirmed"],
         ).select_related("slot")
 
+        reassigned_appointments = 0
+        cancelled_appointments = 0
+
         for appointment in future_appointments:
             # Try to find matching time slot with replacement doctor.
-            replacement_slot = DoctorSlot.objects.filter(
-                doctor=replacement,
-                date=appointment.slot.date,
-                start_time=appointment.slot.start_time,
-                end_time=appointment.slot.end_time,
-                is_available=True,
+            replacement_slot = with_remaining_capacity(
+                DoctorSlot.objects.filter(
+                    doctor=replacement,
+                    date=appointment.slot.date,
+                    start_time=appointment.slot.start_time,
+                    end_time=appointment.slot.end_time,
+                    is_available=True,
+                )
             ).first()
             if not replacement_slot:
+                appointment.status = "cancelled"
+                appointment.save(update_fields=["status", "updated_at"])
+                cancelled_appointments += 1
                 continue
-            appointment.slot.is_available = True
-            appointment.slot.save(update_fields=["is_available"])
-
-            replacement_slot.is_available = False
-            replacement_slot.save(update_fields=["is_available"])
 
             appointment.doctor = replacement
             appointment.slot = replacement_slot
             appointment.save(update_fields=["doctor", "slot", "updated_at"])
+            reassigned_appointments += 1
 
         doctor.is_active = False
         doctor.save(update_fields=["is_active"])
 
-        return Response({"detail": "Doctor removed and future appointments reassigned where slots matched."})
+        return Response(
+            {
+                "detail": "Doctor removed. Future appointments were reassigned when possible and cancelled otherwise.",
+                "reassigned_appointments": reassigned_appointments,
+                "cancelled_appointments": cancelled_appointments,
+            }
+        )
 
 class AdminUserListView(generics.ListAPIView):
     serializer_class = AdminUserListSerializer
@@ -446,9 +475,6 @@ class AdminUserStatusUpdateView(APIView):
                     for appointment in upcoming_appointments:
                         appointment.status = "cancelled"
                         appointment.save(update_fields=["status", "updated_at"])
-
-                        appointment.slot.is_available = True
-                        appointment.slot.save(update_fields=["is_available"])
 
                 doctor_profile.is_active = next_status
                 doctor_profile.save(update_fields=["is_active"])
@@ -528,11 +554,13 @@ class DoctorPublicSlotListView(generics.ListAPIView):
 
     def get_queryset(self):
         doctor_id = self.kwargs["doctor_id"]
-        return DoctorSlot.objects.filter(
-            doctor_id=doctor_id,
-            doctor__is_active=True,
-            is_available=True,
-            date__gte=date.today(),
+        return with_remaining_capacity(
+            DoctorSlot.objects.filter(
+                doctor_id=doctor_id,
+                doctor__is_active=True,
+                is_available=True,
+                date__gte=date.today(),
+            )
         )
 
 class SlotListByDoctorView(generics.ListAPIView):
@@ -543,11 +571,13 @@ class SlotListByDoctorView(generics.ListAPIView):
         doctor_id = self.request.query_params.get("doctor_id")
         if not doctor_id:
             return DoctorSlot.objects.none()
-        return DoctorSlot.objects.filter(
-            doctor_id=doctor_id,
-            doctor__is_active=True,
-            is_available=True,
-            date__gte=date.today(),
+        return with_remaining_capacity(
+            DoctorSlot.objects.filter(
+                doctor_id=doctor_id,
+                doctor__is_active=True,
+                is_available=True,
+                date__gte=date.today(),
+            )
         )
 
 class PatientHistoryForDoctorAdminView(generics.ListAPIView):

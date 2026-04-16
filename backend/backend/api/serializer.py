@@ -33,6 +33,14 @@ MEDICAL_TEXT_NA_FIELDS = (
     "major_past_surgeries",
 )
 
+PUBLIC_REGISTRATION_ROLES = (
+    ("patient", "Patient"),
+    ("doctor", "Doctor"),
+)
+
+APPOINTMENT_LIMIT_PER_SLOT = 15
+ACTIVE_SLOT_STATUSES = ("pending", "confirmed", "completed")
+
 
 def infer_shift_type(start_time, end_time):
     for shift_type, (start, end) in SHIFT_WINDOWS.items():
@@ -41,8 +49,26 @@ def infer_shift_type(start_time, end_time):
     return "custom"
 
 
+def get_slot_occupancy(slot, exclude_appointment_id=None):
+    queryset = Appointment.objects.filter(slot=slot, status__in=ACTIVE_SLOT_STATUSES)
+    if exclude_appointment_id is not None:
+        queryset = queryset.exclude(id=exclude_appointment_id)
+    return queryset.count()
+
+
+def ensure_slot_can_accept_appointment(slot, exclude_appointment_id=None):
+    if not slot.is_available:
+        raise serializers.ValidationError({"slot_id": "Slot is not available."})
+    if not slot.doctor.is_active:
+        raise serializers.ValidationError({"slot_id": "Doctor is not active."})
+
+    occupied = get_slot_occupancy(slot, exclude_appointment_id=exclude_appointment_id)
+    if occupied >= APPOINTMENT_LIMIT_PER_SLOT:
+        raise serializers.ValidationError({"slot_id": f"Slot is full. Maximum {APPOINTMENT_LIMIT_PER_SLOT} appointments allowed."})
+
+
 class RegisterSerializer(serializers.ModelSerializer):
-    role = serializers.ChoiceField(choices=UserProfile.ROLE_CHOICES, write_only=True)
+    role = serializers.ChoiceField(choices=PUBLIC_REGISTRATION_ROLES, write_only=True)
 
     class Meta:
         model = User
@@ -194,6 +220,7 @@ class DoctorSlotSerializer(serializers.ModelSerializer):
     doctor_id = serializers.IntegerField(source="doctor.id", read_only=True)
     shift_type = serializers.SerializerMethodField()
     shift_label = serializers.SerializerMethodField()
+    remaining_capacity = serializers.SerializerMethodField()
 
     class Meta:
         model = DoctorSlot
@@ -206,6 +233,7 @@ class DoctorSlotSerializer(serializers.ModelSerializer):
             "shift_type",
             "shift_label",
             "is_available",
+            "remaining_capacity",
         ]
 
     def validate(self, attrs):
@@ -221,6 +249,12 @@ class DoctorSlotSerializer(serializers.ModelSerializer):
     def get_shift_label(self, obj):
         shift_type = infer_shift_type(obj.start_time, obj.end_time)
         return SHIFT_LABELS.get(shift_type, "Custom")
+
+    def get_remaining_capacity(self, obj):
+        occupied = getattr(obj, "active_appointments", None)
+        if occupied is None:
+            occupied = get_slot_occupancy(obj)
+        return max(0, APPOINTMENT_LIMIT_PER_SLOT - occupied)
 
 
 class DoctorWeeklyAvailabilitySerializer(serializers.ModelSerializer):
@@ -314,13 +348,7 @@ class BookAppointmentSerializer(serializers.Serializer):
         ).first()
         if not slot:
             raise serializers.ValidationError({"slot_id": "Slot not found."})
-        if not slot.is_available:
-            raise serializers.ValidationError({"slot_id": "Slot is not available."})
-        if not slot.doctor.is_active:
-            raise serializers.ValidationError({"slot_id": "Doctor is not active."})
-
-        slot.is_available = False
-        slot.save(update_fields=["is_available"])
+        ensure_slot_can_accept_appointment(slot)
 
         return Appointment.objects.create(
             patient=patient,
@@ -335,22 +363,21 @@ class RescheduleAppointmentSerializer(serializers.Serializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
+        request = self.context.get("request")
+        request_user = getattr(request, "user", None)
+        request_role = getattr(getattr(request_user, "profile", None), "role", None)
+
         new_slot = DoctorSlot.objects.select_for_update().select_related("doctor", "doctor__user").filter(
             id=validated_data["slot_id"]
         ).first()
         if not new_slot:
             raise serializers.ValidationError({"slot_id": "Slot not found."})
-        if not new_slot.is_available:
-            raise serializers.ValidationError({"slot_id": "Slot is not available."})
-        if not new_slot.doctor.is_active:
-            raise serializers.ValidationError({"slot_id": "Doctor is not active."})
+        if request_role == "patient" and new_slot.doctor_id != instance.doctor_id:
+            raise serializers.ValidationError({"slot_id": "Patients can only reschedule within the same doctor."})
+        if request_role == "doctor" and new_slot.doctor.user_id != request_user.id:
+            raise serializers.ValidationError({"slot_id": "Doctors can only use their own slots."})
 
-        old_slot = instance.slot
-        old_slot.is_available = True
-        old_slot.save(update_fields=["is_available"])
-
-        new_slot.is_available = False
-        new_slot.save(update_fields=["is_available"])
+        ensure_slot_can_accept_appointment(new_slot, exclude_appointment_id=instance.id)
 
         instance.slot = new_slot
         instance.doctor = new_slot.doctor

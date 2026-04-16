@@ -7,9 +7,12 @@ class RolePermission(BasePermission):
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
+        profile = getattr(request.user, "profile", None)
         if self.allowed_roles is None:
             return True
-        return getattr(request.user.profile, "role", None) in self.allowed_roles
+        if not profile:
+            return False
+        return getattr(profile, "role", None) in self.allowed_roles
 
 
 class IsPatient(RolePermission):
@@ -32,4 +35,7 @@ class IsProfileCompleted(BasePermission):
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
-        return bool(getattr(request.user.profile, "profile_completed", False))
+        profile = getattr(request.user, "profile", None)
+        if not profile:
+            return False
+        return bool(getattr(profile, "profile_completed", False))

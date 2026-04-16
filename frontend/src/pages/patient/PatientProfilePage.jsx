@@ -1,5 +1,5 @@
 import React from "react";
-import { getPatientMedicalProfile, updatePatientMedicalProfile } from "../../services/hospitalApi";
+import { getPatientMedicalProfile, updatePatientMedicalProfile } from "../../services/HospitalApi";
 import { useAuth } from "../../auth/AuthProvider";
 
 const OTHER_OPTION_VALUE = "__OTHER__";
