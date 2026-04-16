@@ -1,0 +1,157 @@
+# SE-PROJECT
+
+Hospital appointment management system with:
+- Django REST backend
+- React + Vite frontend
+- JWT-based authentication with role-based access
+
+## Tech Stack
+
+- Backend: Django, Django REST Framework, SimpleJWT
+- Frontend: React, Vite, Axios, React Router
+- Database: SQLite (default)
+
+## Project Structure
+
+- backend/backend: Django project root (manage.py location)
+- backend/backend/api: API app (models, serializers, views)
+- frontend: React app
+
+## Prerequisites
+
+- Python 3.10+
+- Node.js 18+
+- npm
+
+## Backend Setup
+
+1. Open terminal in backend project root:
+
+	cd backend/backend
+
+2. Create and activate virtual environment (if needed):
+
+	python -m venv .venv
+	.venv\Scripts\activate
+
+3. Install dependencies:
+
+	pip install -r ../requirements.txt
+
+4. Run migrations:
+
+	python manage.py migrate
+
+5. Start backend server:
+
+	python manage.py runserver
+
+Backend default URL:
+- http://127.0.0.1:8000
+
+## Frontend Setup
+
+1. Open terminal in frontend root:
+
+	cd frontend
+
+2. Install dependencies:
+
+	npm install
+
+3. Start frontend dev server:
+
+	npm run dev
+
+Frontend build:
+
+	npm run build
+
+## Environment Notes
+
+Frontend API base URL can be set with:
+- VITE_API_BASE
+
+If not set, frontend uses:
+- http://localhost:8000
+
+## Authentication and Roles
+
+Roles:
+- patient
+- doctor
+- admin
+
+Public self-registration allows:
+- patient
+- doctor
+
+JWT endpoints:
+- POST /api/auth/register/
+- POST /api/auth/login/
+- POST /api/auth/refresh/
+
+## Core Features
+
+- Role-based protected routes and APIs
+- Doctor weekly availability and generated slots
+- Appointment booking, cancellation, rescheduling
+- Admin dashboard and user management
+- Consultation reports by doctors
+
+## Slot Capacity Rule
+
+Each doctor slot now supports up to 15 appointments.
+
+Details:
+- Slots are considered available only while active appointments in that slot are less than 15.
+- Active statuses for capacity are: pending, confirmed, completed.
+- Cancelled appointments do not consume capacity.
+
+## Important API Areas
+
+- Doctors and slots:
+  - GET /api/doctors/
+  - GET /api/doctors/<doctor_id>/slots/
+  - GET /api/slots/?doctor_id=<id>
+
+- Appointments:
+  - GET /api/appointments/
+  - POST /api/appointments/book/
+  - PATCH /api/appointments/<appointment_id>/cancel/
+  - PATCH /api/appointments/<appointment_id>/reschedule/
+  - PATCH /api/appointments/<appointment_id>/hide/
+  - GET /api/appointments/today/
+
+- Admin:
+  - GET /api/admin/dashboard-summary/
+  - GET /api/admin/users/
+  - PATCH /api/admin/users/<user_id>/status/
+  - POST /api/admin/doctors/<doctor_id>/remove/
+
+## Common Commands
+
+Backend checks:
+
+	python manage.py check
+	python manage.py showmigrations api
+
+Frontend:
+
+	npm run dev
+	npm run build
+
+## Troubleshooting
+
+- If frontend shows auth or API errors:
+  - Confirm backend is running on port 8000.
+  - Confirm VITE_API_BASE matches backend URL.
+
+- If Django reports model changes:
+  - Run python manage.py makemigrations
+  - Run python manage.py migrate
+
+- If npm run dev fails:
+  - Delete node_modules and package-lock.json
+  - Run npm install again
+
