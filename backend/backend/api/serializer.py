@@ -40,6 +40,20 @@ PUBLIC_REGISTRATION_ROLES = (
 
 APPOINTMENT_LIMIT_PER_SLOT = 15
 ACTIVE_SLOT_STATUSES = ("pending", "confirmed", "completed")
+MOBILE_NUMBER_LENGTH = 10
+
+
+def normalize_mobile_number(value):
+    clean = str(value or "").strip()
+    if not clean:
+        return ""
+
+    digits_only = "".join(ch for ch in clean if ch.isdigit())
+    if len(digits_only) != MOBILE_NUMBER_LENGTH:
+        raise serializers.ValidationError(
+            f"Mobile number must be exactly {MOBILE_NUMBER_LENGTH} digits."
+        )
+    return digits_only
 
 
 def infer_shift_type(start_time, end_time):
@@ -92,10 +106,15 @@ def is_doctor_profile_complete(doctor_profile):
 
 
 def is_patient_profile_complete(user, medical_profile):
+    try:
+        normalized_mobile = normalize_mobile_number(medical_profile.mobile)
+    except serializers.ValidationError:
+        normalized_mobile = ""
+
     return (
         bool((user.first_name or "").strip())
         and bool((user.last_name or "").strip())
-        and bool((medical_profile.mobile or "").strip())
+        and bool(normalized_mobile)
         and medical_profile.age is not None
         and bool((medical_profile.gender or "").strip())
         and bool((medical_profile.blood_group or "").strip())
@@ -194,6 +213,9 @@ class PatientMedicalProfileSerializer(serializers.ModelSerializer):
             "current_medications",
             "major_past_surgeries",
         ]
+
+    def validate_mobile(self, value):
+        return normalize_mobile_number(value)
 
     def validate(self, attrs):
         for field_name in MEDICAL_TEXT_NA_FIELDS:
@@ -431,6 +453,9 @@ class PatientMedicalProfileSerializer(serializers.ModelSerializer):
             "current_medications",
             "major_past_surgeries",
         ]
+
+    def validate_mobile(self, value):
+        return normalize_mobile_number(value)
 
     def validate(self, attrs):
         for field_name in MEDICAL_TEXT_NA_FIELDS:

@@ -3,6 +3,7 @@ import { getPatientMedicalProfile, updatePatientMedicalProfile } from "../../ser
 import { useAuth } from "../../auth/AuthProvider";
 
 const OTHER_OPTION_VALUE = "__OTHER__";
+const MOBILE_NUMBER_LENGTH = 10;
 
 const MEDICAL_DROPDOWN_OPTIONS = {
   allergies: ["Dust", "Pollen", "Peanuts", "Dairy", "Egg", "Latex", "Penicillin"],
@@ -46,6 +47,14 @@ function parseMedicalFieldValue(value, knownOptions) {
   }
 
   return { selected: OTHER_OPTION_VALUE, customValue: clean };
+}
+
+function normalizeMobileDigits(value) {
+  return String(value || "").replace(/\D/g, "").slice(0, MOBILE_NUMBER_LENGTH);
+}
+
+function isValidMobile(value) {
+  return normalizeMobileDigits(value).length === MOBILE_NUMBER_LENGTH;
 }
 
 export default function PatientProfilePage() {
@@ -139,12 +148,19 @@ export default function PatientProfilePage() {
     e.preventDefault();
     setError("");
     setMessage("");
+
+    const sanitizedMobile = normalizeMobileDigits(medicalProfile.mobile);
+    if (!isValidMobile(sanitizedMobile)) {
+      setError(`Mobile number must be exactly ${MOBILE_NUMBER_LENGTH} digits.`);
+      return;
+    }
+
     try {
       await updatePatientMedicalProfile({
         first_name: medicalProfile.first_name,
         last_name: medicalProfile.last_name,
         email: medicalProfile.email,
-        mobile: medicalProfile.mobile,
+        mobile: sanitizedMobile,
         age: numberOrNull(medicalProfile.age),
         gender: medicalProfile.gender,
         blood_group: medicalProfile.blood_group,
@@ -161,7 +177,7 @@ export default function PatientProfilePage() {
       const completed =
         Boolean((medicalProfile.first_name || "").trim()) &&
         Boolean((medicalProfile.last_name || "").trim()) &&
-        Boolean((medicalProfile.mobile || "").trim()) &&
+        isValidMobile(sanitizedMobile) &&
         numberOrNull(medicalProfile.age) !== null &&
         Boolean((medicalProfile.gender || "").trim()) &&
         Boolean((medicalProfile.blood_group || "").trim()) &&
@@ -205,9 +221,15 @@ export default function PatientProfilePage() {
           <div className="form-group">
             <label>Mobile</label>
             <input
+              type="tel"
               value={medicalProfile.mobile || ""}
-              onChange={(e) => setMedicalProfile((prev) => ({ ...prev, mobile: e.target.value }))}
-              placeholder="Phone number"
+              onChange={(e) => setMedicalProfile((prev) => ({ ...prev, mobile: normalizeMobileDigits(e.target.value) }))}
+              placeholder={`Phone number (${MOBILE_NUMBER_LENGTH} digits)`}
+              inputMode="numeric"
+              pattern={`\\d{${MOBILE_NUMBER_LENGTH}}`}
+              minLength={MOBILE_NUMBER_LENGTH}
+              maxLength={MOBILE_NUMBER_LENGTH}
+              title={`Enter exactly ${MOBILE_NUMBER_LENGTH} digits`}
               required
             />
           </div>
