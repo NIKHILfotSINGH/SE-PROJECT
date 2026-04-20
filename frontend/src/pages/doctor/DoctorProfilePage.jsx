@@ -2,6 +2,27 @@ import React from "react";
 import { getDoctorProfile, updateDoctorProfile } from "../../services/HospitalApi";
 import { useAuth } from "../../auth/AuthProvider";
 
+const MIN_DOCTOR_PRACTICE_START_AGE = 21;
+
+function validateDoctorExperience(age, experienceYears) {
+  if (age === null || age === undefined || Number.isNaN(age)) {
+    return "Age is required.";
+  }
+  if (experienceYears === null || experienceYears === undefined || Number.isNaN(experienceYears)) {
+    return "Experience is required.";
+  }
+  if (experienceYears > age) {
+    return "Experience cannot be greater than age.";
+  }
+
+  const maxRealisticExperience = Math.max(0, age - MIN_DOCTOR_PRACTICE_START_AGE);
+  if (experienceYears > maxRealisticExperience) {
+    return `Experience is unrealistic for age ${age}. Maximum allowed is ${maxRealisticExperience} years.`;
+  }
+
+  return "";
+}
+
 export default function DoctorProfilePage() {
   const { setProfileCompletion } = useAuth();
   const [profile, setProfile] = React.useState({
@@ -45,11 +66,20 @@ export default function DoctorProfilePage() {
     e.preventDefault();
     setError("");
     setMessage("");
+
+    const ageValue = profile.age === "" ? null : Number(profile.age);
+    const experienceYearsValue = Number(profile.experience_years || 0);
+    const experienceError = validateDoctorExperience(ageValue, experienceYearsValue);
+    if (experienceError) {
+      setError(experienceError);
+      return;
+    }
+
     try {
       const payload = {
         ...profile,
-        experience_years: Number(profile.experience_years || 0),
-        age: profile.age === "" ? null : Number(profile.age),
+        experience_years: experienceYearsValue,
+        age: ageValue,
       };
       const updated = await updateDoctorProfile(payload);
       setProfile(normalizeProfile(updated));
@@ -100,7 +130,14 @@ export default function DoctorProfilePage() {
         </div>
         <div className="form-group">
           <label>Experience (years)</label>
-          <input type="number" min="0" value={profile.experience_years ?? 0} onChange={(e) => setProfile((p) => ({ ...p, experience_years: Number(e.target.value) }))} required />
+          <input
+            type="number"
+            min="0"
+            max={Math.max(0, Number(profile.age || 0) - MIN_DOCTOR_PRACTICE_START_AGE)}
+            value={profile.experience_years ?? 0}
+            onChange={(e) => setProfile((p) => ({ ...p, experience_years: Number(e.target.value) }))}
+            required
+          />
         </div>
         <div className="form-group">
           <label>Qualification</label>

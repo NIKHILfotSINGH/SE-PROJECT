@@ -1,8 +1,12 @@
 from django.test import TestCase
 from django.contrib.auth.models import User
 
-from .models import PatientMedicalProfile
-from .serializer import PatientMedicalProfileSerializer, is_patient_profile_complete
+from .models import DoctorProfile, PatientMedicalProfile
+from .serializer import (
+    DoctorProfileSerializer,
+    PatientMedicalProfileSerializer,
+    is_patient_profile_complete,
+)
 
 
 class PatientMedicalProfileSerializerTests(TestCase):
@@ -45,3 +49,47 @@ class PatientMedicalProfileSerializerTests(TestCase):
         self.profile.mobile = "123"
 
         self.assertFalse(is_patient_profile_complete(self.user, self.profile))
+
+
+class DoctorProfileSerializerTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="doctor_profile_test",
+            password="test-pass-123",
+        )
+        self.profile = DoctorProfile.objects.create(
+            user=self.user,
+            speciality="General",
+            qualification="MBBS",
+            age=30,
+            experience_years=5,
+        )
+
+    def test_rejects_experience_greater_than_age(self):
+        serializer = DoctorProfileSerializer(
+            instance=self.profile,
+            data={"age": 30, "experience_years": 60},
+            partial=True,
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("experience_years", serializer.errors)
+
+    def test_rejects_unrealistic_experience_for_young_age(self):
+        serializer = DoctorProfileSerializer(
+            instance=self.profile,
+            data={"age": 20, "experience_years": 10},
+            partial=True,
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("experience_years", serializer.errors)
+
+    def test_accepts_reasonable_age_experience_combination(self):
+        serializer = DoctorProfileSerializer(
+            instance=self.profile,
+            data={"age": 35, "experience_years": 10},
+            partial=True,
+        )
+
+        self.assertTrue(serializer.is_valid(), serializer.errors)

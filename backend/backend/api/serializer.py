@@ -41,6 +41,7 @@ PUBLIC_REGISTRATION_ROLES = (
 APPOINTMENT_LIMIT_PER_SLOT = 15
 ACTIVE_SLOT_STATUSES = ("pending", "confirmed", "completed")
 MOBILE_NUMBER_LENGTH = 10
+MIN_DOCTOR_PRACTICE_START_AGE = 21
 
 
 def normalize_mobile_number(value):
@@ -174,6 +175,31 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
             "bio",
             "is_active",
         ]
+
+    def validate(self, attrs):
+        age = attrs.get("age", getattr(self.instance, "age", None))
+        experience_years = attrs.get("experience_years", getattr(self.instance, "experience_years", None))
+
+        if age is None or experience_years is None:
+            return attrs
+
+        if experience_years > age:
+            raise serializers.ValidationError(
+                {"experience_years": "Experience cannot be greater than age."}
+            )
+
+        max_realistic_experience = max(0, age - MIN_DOCTOR_PRACTICE_START_AGE)
+        if experience_years > max_realistic_experience:
+            raise serializers.ValidationError(
+                {
+                    "experience_years": (
+                        "Experience is unrealistic for the provided age. "
+                        f"Maximum allowed is {max_realistic_experience} years for age {age}."
+                    )
+                }
+            )
+
+        return attrs
 
     def update(self, instance, validated_data):
         user_data = validated_data.pop("user", {})
