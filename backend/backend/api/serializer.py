@@ -57,6 +57,19 @@ def normalize_mobile_number(value):
     return digits_only
 
 
+def has_text_value(value):
+    return bool(str(value or "").strip())
+
+
+def to_int_or_none(value):
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def get_user_display_name(user):
     first_name = (getattr(user, "first_name", "") or "").strip()
     last_name = (getattr(user, "last_name", "") or "").strip()
@@ -119,14 +132,25 @@ def is_patient_profile_complete(user, medical_profile):
     except serializers.ValidationError:
         normalized_mobile = ""
 
+    age_value = to_int_or_none(medical_profile.age)
+    height_value = to_int_or_none(medical_profile.height_cm)
+    weight_value = to_int_or_none(medical_profile.weight_kg)
+
     return (
-        bool((user.first_name or "").strip())
-        and bool((user.last_name or "").strip())
+        has_text_value(user.first_name)
+        and has_text_value(user.last_name)
         and bool(normalized_mobile)
-        and medical_profile.age is not None
-        and bool((medical_profile.gender or "").strip())
+        and age_value is not None
+        and age_value >= 0
+        and has_text_value(medical_profile.gender)
         and bool((medical_profile.blood_group or "").strip())
         and medical_profile.blood_group != "UNKNOWN"
+        and height_value is not None
+        and height_value > 0
+        and weight_value is not None
+        and weight_value > 0
+        and has_text_value(medical_profile.disability_notes)
+        and all(has_text_value(getattr(medical_profile, field_name, "")) for field_name in MEDICAL_TEXT_NA_FIELDS)
     )
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -256,12 +280,80 @@ class PatientMedicalProfileSerializer(serializers.ModelSerializer):
         return normalize_mobile_number(value)
 
     def validate(self, attrs):
-        for field_name in MEDICAL_TEXT_NA_FIELDS:
-            if field_name not in attrs:
+        instance = self.instance
+
+        def get_profile_value(field_name):
+            if field_name in attrs:
+                return attrs.get(field_name)
+            if instance is not None:
+                return getattr(instance, field_name, None)
+            return None
+
+        user_attrs = attrs.get("user", {}) if isinstance(attrs.get("user"), dict) else {}
+        current_user = getattr(instance, "user", None)
+        errors = {}
+
+        first_name = str(user_attrs.get("first_name", getattr(current_user, "first_name", ""))).strip()
+        last_name = str(user_attrs.get("last_name", getattr(current_user, "last_name", ""))).strip()
+        if not first_name:
+            errors["first_name"] = "This field is required."
+        if not last_name:
+            errors["last_name"] = "This field is required."
+
+        mobile_value = get_profile_value("mobile")
+        try:
+            attrs["mobile"] = normalize_mobile_number(mobile_value)
+        except serializers.ValidationError as exc:
+            detail = exc.detail
+            if isinstance(detail, (list, tuple)) and detail:
+                errors["mobile"] = str(detail[0])
+            else:
+                errors["mobile"] = str(detail)
+
+        age_value = get_profile_value("age")
+        age_numeric = to_int_or_none(age_value)
+        if age_numeric is None:
+            errors["age"] = "This field is required."
+        elif age_numeric < 0:
+            errors["age"] = "Age cannot be negative."
+        else:
+            attrs["age"] = age_numeric
+
+        gender_value = str(get_profile_value("gender") or "").strip()
+        if not gender_value:
+            errors["gender"] = "This field is required."
+        else:
+            attrs["gender"] = gender_value
+
+        for field_name, label in (("height_cm", "Height"), ("weight_kg", "Weight")):
+            numeric_value = to_int_or_none(get_profile_value(field_name))
+            if numeric_value is None:
+                errors[field_name] = "This field is required."
                 continue
-            value = attrs.get(field_name)
-            if value is None or not str(value).strip():
-                attrs[field_name] = "NA"
+            if numeric_value <= 0:
+                errors[field_name] = f"{label} must be greater than 0."
+                continue
+            attrs[field_name] = numeric_value
+
+        blood_group_value = str(get_profile_value("blood_group") or "").strip().upper()
+        if not blood_group_value or blood_group_value == "UNKNOWN":
+            errors["blood_group"] = "Please select a valid blood group."
+        else:
+            attrs["blood_group"] = blood_group_value
+
+        disability_notes_value = str(get_profile_value("disability_notes") or "").strip()
+        if not disability_notes_value:
+            errors["disability_notes"] = "This field is required."
+        else:
+            attrs["disability_notes"] = disability_notes_value
+
+        for field_name in MEDICAL_TEXT_NA_FIELDS:
+            value = get_profile_value(field_name)
+            attrs[field_name] = str(value or "").strip() or "NA"
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
         return attrs
 
     def update(self, instance, validated_data):

@@ -7,6 +7,7 @@ import PatientLayout from "./pages/patient/PatientLayout";
 import PatientSearchPage from "./pages/patient/PatientSearchPage";
 import PatientAppointmentsPage from "./pages/patient/PatientAppointmentsPage";
 import PatientProfilePage from "./pages/patient/PatientProfilePage";
+import PatientMedicalProfileGuard from "./components/PatientMedicalProfileGuard";
 import DoctorLayout from "./pages/doctor/DoctorLayout";
 import DoctorProfilePage from "./pages/doctor/DoctorProfilePage";
 import DoctorSlotsPage from "./pages/doctor/DoctorSlotsPages";
@@ -25,9 +26,11 @@ export default function App() {
         <Route element={<RoleRoute allowed={["patient"]} />}>
           <Route path="/patient" element={<PatientLayout />}>
             <Route index element={<Navigate to="search" replace />} />
-            <Route path="search" element={<PatientSearchPage />} />
-            <Route path="appointments" element={<PatientAppointmentsPage />} />
             <Route path="profile" element={<PatientProfilePage />} />
+            <Route element={<PatientMedicalProfileGuard />}>
+              <Route path="search" element={<PatientSearchPage />} />
+              <Route path="appointments" element={<PatientAppointmentsPage />} />
+            </Route>
           </Route>
         </Route>
         <Route element={<RoleRoute allowed={["doctor"]} />}>

@@ -1,6 +1,8 @@
 import React from "react";
+import { useLocation } from "react-router-dom";
 import { getPatientMedicalProfile, updatePatientMedicalProfile } from "../../services/HospitalApi";
 import { useAuth } from "../../auth/AuthProvider";
+import { hasValidBloodGroup, isPatientMedicalProfileComplete, normalizeBloodGroup } from "../../utils/patientMedicalProfile";
 
 const OTHER_OPTION_VALUE = "__OTHER__";
 const MOBILE_NUMBER_LENGTH = 10;
@@ -57,8 +59,21 @@ function isValidMobile(value) {
   return normalizeMobileDigits(value).length === MOBILE_NUMBER_LENGTH;
 }
 
+function hasTextValue(value) {
+  return Boolean(String(value || "").trim());
+}
+
+function hasPositiveNumber(value) {
+  if (value === null || value === "") {
+    return false;
+  }
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) && numericValue > 0;
+}
+
 export default function PatientProfilePage() {
   const { setProfileCompletion } = useAuth();
+  const location = useLocation();
   const defaultProfile = React.useMemo(() => ({
     first_name: "",
     last_name: "",
@@ -94,10 +109,19 @@ export default function PatientProfilePage() {
   const [error, setError] = React.useState("");
 
   React.useEffect(() => {
+    const profileAlert = location.state?.profileAlert;
+    if (profileAlert) {
+      setError(profileAlert);
+      setMessage("");
+    }
+  }, [location.state]);
+
+  React.useEffect(() => {
     (async () => {
       try {
         const data = await getPatientMedicalProfile();
         const nextProfile = { ...defaultProfile, ...data };
+        nextProfile.blood_group = normalizeBloodGroup(nextProfile.blood_group) || "UNKNOWN";
         setMedicalProfile(nextProfile);
 
         const nextSelections = {};
@@ -149,11 +173,58 @@ export default function PatientProfilePage() {
     setError("");
     setMessage("");
 
+    const missingFields = [];
+
+    if (!hasTextValue(medicalProfile.first_name)) {
+      missingFields.push("First Name");
+    }
+    if (!hasTextValue(medicalProfile.last_name)) {
+      missingFields.push("Last Name");
+    }
+    if (numberOrNull(medicalProfile.age) === null) {
+      missingFields.push("Age");
+    }
+    if (!hasTextValue(medicalProfile.gender)) {
+      missingFields.push("Gender");
+    }
+    if (!hasPositiveNumber(medicalProfile.height_cm)) {
+      missingFields.push("Height (cm)");
+    }
+    if (!hasPositiveNumber(medicalProfile.weight_kg)) {
+      missingFields.push("Weight (kg)");
+    }
+    if (!hasTextValue(medicalProfile.disability_notes)) {
+      missingFields.push("Disability / Accessibility Needs");
+    }
+
+    MEDICAL_FIELD_CONFIGS.forEach((field) => {
+      const selectedValue = medicalSelections[field.key];
+      if (!selectedValue) {
+        missingFields.push(field.label);
+      }
+      if (selectedValue === OTHER_OPTION_VALUE && !hasTextValue(customMedicalValues[field.key])) {
+        missingFields.push(`${field.label} (Other details)`);
+      }
+    });
+
+    if (missingFields.length) {
+      setError(`Please complete all mandatory fields: ${missingFields.join(", ")}.`);
+      return;
+    }
+
     const sanitizedMobile = normalizeMobileDigits(medicalProfile.mobile);
     if (!isValidMobile(sanitizedMobile)) {
       setError(`Mobile number must be exactly ${MOBILE_NUMBER_LENGTH} digits.`);
       return;
     }
+
+    const normalizedBloodGroup = normalizeBloodGroup(medicalProfile.blood_group);
+    if (!hasValidBloodGroup(normalizedBloodGroup)) {
+      setError("Please select a valid blood group.");
+      return;
+    }
+
+    const normalizedDisabilityNotes = String(medicalProfile.disability_notes || "").trim();
 
     try {
       await updatePatientMedicalProfile({
@@ -163,7 +234,7 @@ export default function PatientProfilePage() {
         mobile: sanitizedMobile,
         age: numberOrNull(medicalProfile.age),
         gender: medicalProfile.gender,
-        blood_group: medicalProfile.blood_group,
+        blood_group: normalizedBloodGroup,
         previous_diagnosis: medicalProfile.previous_diagnosis,
         allergies: textOrNA(medicalProfile.allergies),
         chronic_conditions: textOrNA(medicalProfile.chronic_conditions),
@@ -171,17 +242,19 @@ export default function PatientProfilePage() {
         major_past_surgeries: textOrNA(medicalProfile.major_past_surgeries),
         height_cm: numberOrNull(medicalProfile.height_cm),
         weight_kg: numberOrNull(medicalProfile.weight_kg),
-        disability_notes: medicalProfile.disability_notes,
+        disability_notes: normalizedDisabilityNotes,
       });
 
-      const completed =
-        Boolean((medicalProfile.first_name || "").trim()) &&
-        Boolean((medicalProfile.last_name || "").trim()) &&
-        isValidMobile(sanitizedMobile) &&
-        numberOrNull(medicalProfile.age) !== null &&
-        Boolean((medicalProfile.gender || "").trim()) &&
-        Boolean((medicalProfile.blood_group || "").trim()) &&
-        medicalProfile.blood_group !== "UNKNOWN";
+      const completed = isPatientMedicalProfileComplete({
+        ...medicalProfile,
+        mobile: sanitizedMobile,
+        blood_group: normalizedBloodGroup,
+        disability_notes: normalizedDisabilityNotes,
+        allergies: textOrNA(medicalProfile.allergies),
+        chronic_conditions: textOrNA(medicalProfile.chronic_conditions),
+        current_medications: textOrNA(medicalProfile.current_medications),
+        major_past_surgeries: textOrNA(medicalProfile.major_past_surgeries),
+      });
       setProfileCompletion(completed);
       setMessage("Medical profile updated.");
     } catch (err) {
@@ -263,20 +336,22 @@ export default function PatientProfilePage() {
             <label>Height (cm)</label>
             <input
               type="number"
-              min="0"
+              min="1"
               value={medicalProfile.height_cm ?? ""}
               onChange={(e) => setMedicalProfile((prev) => ({ ...prev, height_cm: e.target.value }))}
               placeholder="e.g. 170"
+              required
             />
           </div>
           <div className="form-group">
             <label>Weight (kg)</label>
             <input
               type="number"
-              min="0"
+              min="1"
               value={medicalProfile.weight_kg ?? ""}
               onChange={(e) => setMedicalProfile((prev) => ({ ...prev, weight_kg: e.target.value }))}
               placeholder="e.g. 65"
+              required
             />
           </div>
           <div className="form-group">
@@ -305,6 +380,7 @@ export default function PatientProfilePage() {
             value={medicalProfile.disability_notes || ""}
             onChange={(e) => setMedicalProfile((prev) => ({ ...prev, disability_notes: e.target.value }))}
             placeholder="List any disabilities, assistive devices, or accessibility preferences"
+            required
           />
         </div>
 
@@ -329,6 +405,7 @@ export default function PatientProfilePage() {
                 value={customMedicalValues[field.key] || ""}
                 onChange={(e) => handleMedicalOtherInput(field.key, e.target.value)}
                 placeholder={field.placeholder}
+                required
               />
             )}
           </div>
