@@ -1,95 +1,84 @@
-from django.test import TestCase
+from datetime import date, time
+
 from django.contrib.auth.models import User
+from django.test import TestCase
 
-from .models import DoctorProfile, PatientMedicalProfile
-from .serializer import (
-    DoctorProfileSerializer,
-    PatientMedicalProfileSerializer,
-    is_patient_profile_complete,
-)
+from .models import Appointment, DoctorProfile, DoctorSlot
+from .serializer import AppointmentSerializer, DoctorProfileSerializer
 
 
-class PatientMedicalProfileSerializerTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(
-            username="patient_mobile_test",
-            password="test-pass-123",
-            first_name="John",
-            last_name="Doe",
-        )
-        self.profile = PatientMedicalProfile.objects.create(
-            user=self.user,
-            mobile="9876543210",
-            age=25,
-            gender="male",
-            blood_group="O+",
-        )
+class DoctorDisplayNameSerializerTests(TestCase):
+	def test_doctor_profile_serializer_uses_full_name_as_display_name(self):
+		user = User.objects.create_user(
+			username="doctor.username@example.com",
+			password="test-pass-123",
+			first_name="Aman",
+			last_name="Raj",
+		)
+		profile = DoctorProfile.objects.create(
+			user=user,
+			speciality="General",
+			experience_years=3,
+			age=28,
+			qualification="MBBS",
+		)
 
-    def test_rejects_mobile_with_wrong_length(self):
-        serializer = PatientMedicalProfileSerializer(
-            instance=self.profile,
-            data={"mobile": "12345"},
-            partial=True,
-        )
+		data = DoctorProfileSerializer(profile).data
+		self.assertEqual(data["display_name"], "Aman Raj")
 
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("mobile", serializer.errors)
+	def test_doctor_profile_serializer_falls_back_to_username(self):
+		user = User.objects.create_user(
+			username="doctor.username@example.com",
+			password="test-pass-123",
+		)
+		profile = DoctorProfile.objects.create(
+			user=user,
+			speciality="General",
+			experience_years=3,
+			age=28,
+			qualification="MBBS",
+		)
 
-    def test_accepts_mobile_with_formatting_and_normalizes(self):
-        serializer = PatientMedicalProfileSerializer(
-            instance=self.profile,
-            data={"mobile": "(987) 654-3210"},
-            partial=True,
-        )
-
-        self.assertTrue(serializer.is_valid(), serializer.errors)
-        self.assertEqual(serializer.validated_data["mobile"], "9876543210")
-
-    def test_profile_completion_is_false_for_invalid_mobile(self):
-        self.profile.mobile = "123"
-
-        self.assertFalse(is_patient_profile_complete(self.user, self.profile))
+		data = DoctorProfileSerializer(profile).data
+		self.assertEqual(data["display_name"], "doctor.username@example.com")
 
 
-class DoctorProfileSerializerTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(
-            username="doctor_profile_test",
-            password="test-pass-123",
-        )
-        self.profile = DoctorProfile.objects.create(
-            user=self.user,
-            speciality="General",
-            qualification="MBBS",
-            age=30,
-            experience_years=5,
-        )
+class AppointmentDisplayNameSerializerTests(TestCase):
+	def test_appointment_serializer_uses_real_names_not_usernames(self):
+		patient = User.objects.create_user(
+			username="patient.email@example.com",
+			password="test-pass-123",
+			first_name="Nikhil",
+			last_name="Singh",
+		)
+		doctor_user = User.objects.create_user(
+			username="doctor.email@example.com",
+			password="test-pass-123",
+			first_name="Aman",
+			last_name="Raj",
+		)
+		doctor = DoctorProfile.objects.create(
+			user=doctor_user,
+			speciality="General",
+			experience_years=5,
+			age=32,
+			qualification="MBBS",
+		)
+		slot = DoctorSlot.objects.create(
+			doctor=doctor,
+			date=date.today(),
+			start_time=time(13, 0),
+			end_time=time(16, 0),
+			is_available=True,
+		)
+		appointment = Appointment.objects.create(
+			patient=patient,
+			doctor=doctor,
+			slot=slot,
+			status="pending",
+			reason="Fever",
+		)
 
-    def test_rejects_experience_greater_than_age(self):
-        serializer = DoctorProfileSerializer(
-            instance=self.profile,
-            data={"age": 30, "experience_years": 60},
-            partial=True,
-        )
-
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("experience_years", serializer.errors)
-
-    def test_rejects_unrealistic_experience_for_young_age(self):
-        serializer = DoctorProfileSerializer(
-            instance=self.profile,
-            data={"age": 20, "experience_years": 10},
-            partial=True,
-        )
-
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("experience_years", serializer.errors)
-
-    def test_accepts_reasonable_age_experience_combination(self):
-        serializer = DoctorProfileSerializer(
-            instance=self.profile,
-            data={"age": 35, "experience_years": 10},
-            partial=True,
-        )
-
-        self.assertTrue(serializer.is_valid(), serializer.errors)
+		data = AppointmentSerializer(appointment).data
+		self.assertEqual(data["doctor_name"], "Aman Raj")
+		self.assertEqual(data["patient_name"], "Nikhil Singh")

@@ -89,6 +89,8 @@ export default function PatientSearchPage() {
 
   const selectedDoctor = doctors.find((doc) => String(doc.doctor_id) === String(selectedDoctorId));
 
+  const doctorDisplayName = (doctor) => doctor.display_name || `${doctor.first_name || ""} ${doctor.last_name || ""}`.trim() || doctor.username;
+
   function openDoctorProfile(doctor) {
     setSelectedDoctorProfile(doctor);
     setIsDoctorProfileOpen(true);
@@ -166,7 +168,7 @@ export default function PatientSearchPage() {
             {doctors.map((doc) => (
               <div key={doc.doctor_id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 12, background: "var(--surface)" }}>
                 <p style={{ margin: 0, fontWeight: 700 }}>
-                  Dr. {doc.first_name || doc.username} {doc.last_name || ""}
+                  Dr. {doctorDisplayName(doc)}
                 </p>
                 <p style={{ margin: "6px 0" }}>
                   {doc.speciality} • {doc.experience_years} years experience
@@ -206,7 +208,7 @@ export default function PatientSearchPage() {
                 <option value="">Choose doctor</option>
                 {doctors.map((doc) => (
                   <option key={doc.doctor_id} value={doc.doctor_id}>
-                    {doc.username} - {doc.speciality} ({doc.experience_years} yrs)
+                    {doctorDisplayName(doc)} - {doc.speciality} ({doc.experience_years} yrs)
                   </option>
                 ))}
               </select>
@@ -214,7 +216,7 @@ export default function PatientSearchPage() {
 
             {selectedDoctor && (
               <p className="small" style={{ textAlign: "left", marginTop: -6, marginBottom: 12 }}>
-                Booking with Dr. {selectedDoctor.first_name || selectedDoctor.username} ({selectedDoctor.speciality})
+                Booking with Dr. {doctorDisplayName(selectedDoctor)} ({selectedDoctor.speciality})
               </p>
             )}
 
@@ -283,7 +285,7 @@ export default function PatientSearchPage() {
 
             <div style={{ marginTop: 12 }}>
               <p style={{ margin: "6px 0" }}>
-                Name: Dr. {selectedDoctorProfile.first_name || selectedDoctorProfile.username} {selectedDoctorProfile.last_name || ""}
+                Name: Dr. {doctorDisplayName(selectedDoctorProfile)}
               </p>
               <p style={{ margin: "6px 0" }}>Email: {selectedDoctorProfile.email || "Not provided"}</p>
               <p style={{ margin: "6px 0" }}>Age: {selectedDoctorProfile.age ?? "Not provided"}</p>

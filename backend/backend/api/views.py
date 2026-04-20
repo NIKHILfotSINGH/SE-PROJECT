@@ -331,7 +331,12 @@ class DoctorListView(generics.ListAPIView):
         q = self.request.query_params.get("q", "").strip() or self.request.query_params.get("search", "").strip()
         speciality = self.request.query_params.get("speciality", "").strip()
         if q:
-            queryset = queryset.filter(Q(user__username__icontains=q) | Q(speciality__icontains=q))
+            queryset = queryset.filter(
+                Q(user__username__icontains=q)
+                | Q(user__first_name__icontains=q)
+                | Q(user__last_name__icontains=q)
+                | Q(speciality__icontains=q)
+            )
         if speciality:
             queryset = queryset.filter(speciality__icontains=speciality)
         return queryset

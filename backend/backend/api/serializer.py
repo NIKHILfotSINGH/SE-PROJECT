@@ -57,6 +57,13 @@ def normalize_mobile_number(value):
     return digits_only
 
 
+def get_user_display_name(user):
+    first_name = (getattr(user, "first_name", "") or "").strip()
+    last_name = (getattr(user, "last_name", "") or "").strip()
+    full_name = " ".join(part for part in [first_name, last_name] if part)
+    return full_name or (getattr(user, "username", "") or "")
+
+
 def infer_shift_type(start_time, end_time):
     for shift_type, (start, end) in SHIFT_WINDOWS.items():
         if start_time == start and end_time == end:
@@ -155,6 +162,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class DoctorProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True)
+    display_name = serializers.SerializerMethodField(read_only=True)
     first_name = serializers.CharField(source="user.first_name", required=False, allow_blank=True)
     last_name = serializers.CharField(source="user.last_name", required=False, allow_blank=True)
     email = serializers.EmailField(source="user.email", required=False, allow_blank=True)
@@ -165,6 +173,7 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
         fields = [
             "doctor_id",
             "username",
+            "display_name",
             "first_name",
             "last_name",
             "email",
@@ -175,6 +184,9 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
             "bio",
             "is_active",
         ]
+
+    def get_display_name(self, obj):
+        return get_user_display_name(obj.user)
 
     def validate(self, attrs):
         age = attrs.get("age", getattr(self.instance, "age", None))
@@ -352,9 +364,9 @@ class DoctorWeeklyAvailabilitySerializer(serializers.ModelSerializer):
 
 
 class AppointmentSerializer(serializers.ModelSerializer):
-    doctor_name = serializers.CharField(source="doctor.user.username", read_only=True)
+    doctor_name = serializers.SerializerMethodField()
     doctor_speciality = serializers.CharField(source="doctor.speciality", read_only=True)
-    patient_name = serializers.CharField(source="patient.username", read_only=True)
+    patient_name = serializers.SerializerMethodField()
     slot_date = serializers.DateField(source="slot.date", read_only=True)
     slot_start_time = serializers.TimeField(source="slot.start_time", read_only=True)
     slot_end_time = serializers.TimeField(source="slot.end_time", read_only=True)
@@ -378,6 +390,12 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["patient", "doctor", "created_at", "updated_at"]
+
+    def get_doctor_name(self, obj):
+        return get_user_display_name(obj.doctor.user)
+
+    def get_patient_name(self, obj):
+        return get_user_display_name(obj.patient)
 
 
 class AppointmentStatusUpdateSerializer(serializers.Serializer):
@@ -435,7 +453,7 @@ class RescheduleAppointmentSerializer(serializers.Serializer):
 
 
 class ConsultationReportSerializer(serializers.ModelSerializer):
-    doctor_name = serializers.CharField(source="doctor.user.username", read_only=True)
+    doctor_name = serializers.SerializerMethodField()
 
     class Meta:
         model = ConsultationReport
@@ -451,6 +469,9 @@ class ConsultationReportSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["doctor", "appointment", "created_at", "updated_at"]
+
+    def get_doctor_name(self, obj):
+        return get_user_display_name(obj.doctor.user)
 
 
 class PatientMedicalProfileSerializer(serializers.ModelSerializer):
