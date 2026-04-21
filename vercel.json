@@ -2,23 +2,22 @@
   "version": 2,
   "builds": [
     {
-      "src": "/frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": { "installCommand": "npm install --prefix frontend", "buildCommand": "npm run build --prefix frontend", "outputDirectory": "frontend/dist" }
+      "src": "backend/backend/wsgi.py",
+      "use": "@vercel/python",
+      "config": { "maxLambdaSize": "15mb" }
     },
     {
-      "src": "/backend/backend/wsgi.py",
-      "use": "@vercel/python"
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "installCommand": "cd frontend && npm install",
+        "buildCommand": "cd frontend && npm run build",
+        "outputDirectory": "dist"
+      }
     }
   ],
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/backend/backend/wsgi.py"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/frontend/dist/$1"
-    }
+    { "source": "/api/(.*)", "destination": "/backend/backend/wsgi.py" },
+    { "source": "/(.*)", "destination": "/frontend/index.html" }
   ]
 }
